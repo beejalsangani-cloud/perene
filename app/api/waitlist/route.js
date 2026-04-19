@@ -1,19 +1,10 @@
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import mailchimp from "@mailchimp/mailchimp_marketing";
 
-const DATA_PATH = join(process.cwd(), "data", "waitlist.json");
+// Extract server prefix from the end of the API key (e.g. "…-us2" → "us2")
+const apiKey = process.env.MAILCHIMP_API_KEY;
+const server = apiKey?.split("-").at(-1); // "us2"
 
-function readWaitlist() {
-  try {
-    return JSON.parse(readFileSync(DATA_PATH, "utf-8"));
-  } catch {
-    return [];
-  }
-}
-
-function writeWaitlist(list) {
-  writeFileSync(DATA_PATH, JSON.stringify(list, null, 2));
-}
+mailchimp.setConfig({ apiKey, server });
 
 export async function POST(request) {
   const { email } = await request.json();
@@ -22,15 +13,30 @@ export async function POST(request) {
     return Response.json({ error: "Please provide a valid email." }, { status: 400 });
   }
 
-  const waitlist = readWaitlist();
-  const normalised = email.toLowerCase().trim();
+  const listId = process.env.MAILCHIMP_AUDIENCE_ID;
 
-  if (waitlist.some((e) => e.email === normalised)) {
-    return Response.json({ message: "You're already on the waitlist!" }, { status: 200 });
+  try {
+    await mailchimp.lists.addListMember(listId, {
+      email_address: email.toLowerCase().trim(),
+      status: "subscribed",
+    });
+
+    return Response.json({ message: "You're on the list!" }, { status: 201 });
+  } catch (err) {
+    // The Mailchimp SDK puts the response body as a JSON string in err.response.text
+    const status = err.status ?? err.response?.status;
+    let body = {};
+    try {
+      body = JSON.parse(err.response?.text ?? "{}");
+    } catch {}
+    const title = body?.title;
+
+    // "Member Exists" means already subscribed — treat as success
+    if (status === 400 && title === "Member Exists") {
+      return Response.json({ message: "You're already on the waitlist!" }, { status: 200 });
+    }
+
+    console.error("Mailchimp error:", status, title, body?.detail);
+    return Response.json({ error: "Something went wrong — please try again." }, { status: 500 });
   }
-
-  waitlist.push({ email: normalised, joinedAt: new Date().toISOString() });
-  writeWaitlist(waitlist);
-
-  return Response.json({ message: "You're on the list!" }, { status: 201 });
 }

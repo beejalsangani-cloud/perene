@@ -93,25 +93,21 @@ export default function Navbar() {
         })}
       </ul>
 
-      {/* CTA — hidden on very small screens to avoid crowding */}
-      <a
-        href="#waitlist"
-        onClick={(e) => handleClick(e, "#waitlist")}
-        className="hidden sm:block px-5 py-2.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-semibold text-sm tracking-wide hover:bg-[#d4f562] active:scale-95 transition-all"
-        style={{ fontFamily: "var(--font-inter)" }}
-      >
-        Get Early Access
-      </a>
-
-      {/* Mobile: just the CTA */}
-      <a
-        href="#waitlist"
-        onClick={(e) => handleClick(e, "#waitlist")}
-        className="sm:hidden px-4 py-2 rounded-full bg-[#C4E552] text-[#2A3D2E] font-semibold text-sm hover:bg-[#d4f562] transition-colors"
-        style={{ fontFamily: "var(--font-inter)" }}
-      >
-        Join
-      </a>
+      {/* Auth buttons */}
+      <div className="flex items-center gap-2" style={{ fontFamily: "var(--font-inter)" }}>
+        <a
+          href="/login"
+          className="hidden sm:block px-4 py-2 rounded-full text-[#2A3D2E]/75 text-sm font-medium hover:text-[#2A3D2E] hover:bg-[#2A3D2E]/6 transition-all"
+        >
+          Log In
+        </a>
+        <a
+          href="/signup"
+          className="px-5 py-2.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-semibold text-sm tracking-wide hover:bg-[#d4f562] active:scale-95 transition-all"
+        >
+          Sign Up
+        </a>
+      </div>
     </nav>
   );
 }

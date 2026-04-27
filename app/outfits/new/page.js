@@ -41,9 +41,10 @@ export default function NewOutfitPage() {
 
   const [user,             setUser]             = useState(null);
   const [authReady,        setAuthReady]        = useState(false);
-  const [eventDescription, setEventDescription] = useState("");
+  const [eventDescription, setEventDescription] = useState(searchParams.get("occasion") ?? "");
   const [location,         setLocation]         = useState("");
   const [date,             setDate]             = useState(searchParams.get("date") ?? "");
+
   const [generating,       setGenerating]       = useState(false);
   const [error,            setError]            = useState("");
 

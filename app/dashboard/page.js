@@ -7,6 +7,9 @@ import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 import WeatherWidget from "@/app/components/WeatherWidget";
 import LocationSetup from "@/app/components/LocationSetup";
+import InspirationFeed from "@/app/components/InspirationFeed";
+import StyleTips from "@/app/components/StyleTips";
+import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -336,6 +339,44 @@ export default function DashboardPage() {
             </div>
           </section>
         </div>
+
+        {/* ── New sections ────────────────────────────────────────────── */}
+        {!profileLoading && user && (
+          <div className="mt-10 flex flex-col gap-10">
+
+            {/* Weekly Calendar */}
+            {showWeather && (
+              <WeeklyCalendar defaultLocation={defaultLocation}/>
+            )}
+
+            {/* Tips + (future) saved looks — 2-col on large screens */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <StyleTips userId={user.id}/>
+
+              {/* Placeholder right column — keeps the grid balanced */}
+              <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-6 flex flex-col items-center justify-center gap-4 min-h-[200px]"
+                style={{ fontFamily: "var(--font-inter)" }}>
+                <div className="w-12 h-12 rounded-xl bg-[#F5F1E8] flex items-center justify-center text-[#2A3D2E]">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-[#2A3D2E]" style={{ fontFamily: "var(--font-playfair)" }}>Saved Looks</p>
+                  <p className="text-xs text-[#2A3D2E]/45 mt-1">Your favourite outfits will live here.</p>
+                </div>
+                <span className="inline-flex items-center px-4 py-2 rounded-full bg-[#2A3D2E]/6 text-[#2A3D2E]/35 text-xs font-semibold">
+                  Coming soon
+                </span>
+              </div>
+            </div>
+
+            {/* Inspiration Feed — full width */}
+            <InspirationFeed profile={profile}/>
+
+          </div>
+        )}
+
       </main>
     </div>
   );

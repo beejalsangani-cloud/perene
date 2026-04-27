@@ -227,9 +227,10 @@ function FeatureTile({ icon, title, stat, cta, href, disabled = false }) {
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [user,    setUser]    = useState(null);
-  const [profile, setProfile] = useState(undefined); // undefined = loading, null = no row
-  const [authReady, setAuthReady] = useState(false);
+  const [user,          setUser]          = useState(null);
+  const [profile,       setProfile]       = useState(undefined);
+  const [wardrobeCount, setWardrobeCount] = useState(null); // null = loading
+  const [authReady,     setAuthReady]     = useState(false);
 
   // Auth gate
   useEffect(() => {
@@ -243,19 +244,18 @@ export default function DashboardPage() {
     });
   }, [router]);
 
-  // Load profile once auth is confirmed
+  // Load profile + wardrobe count once auth is confirmed
   useEffect(() => {
     if (!authReady || !user) return;
 
-    supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) console.error("[dashboard] profile fetch error:", error);
-        setProfile(data ?? null);
-      });
+    Promise.all([
+      supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("wardrobe_items").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    ]).then(([profileRes, countRes]) => {
+      if (profileRes.error) console.error("[dashboard] profile fetch error:", profileRes.error);
+      setProfile(profileRes.data ?? null);
+      setWardrobeCount(countRes.count ?? 0);
+    });
   }, [authReady, user]);
 
   // Full-screen spinner until auth resolves
@@ -332,8 +332,8 @@ export default function DashboardPage() {
                   </svg>
                 }
                 title="Your Closet"
-                stat="0 items uploaded"
-                cta="Add clothes →"
+                stat={wardrobeCount === null ? "Loading…" : `${wardrobeCount} item${wardrobeCount === 1 ? "" : "s"} uploaded`}
+                cta="Go to closet →"
                 href="/wardrobe"
                 disabled={false}
               />

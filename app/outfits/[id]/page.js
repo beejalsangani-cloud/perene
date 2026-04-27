@@ -6,6 +6,56 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 
+// ── Weather helpers ───────────────────────────────────────────────────────────
+
+function weatherIcon(code) {
+  if (code === 0)  return "☀️";
+  if (code <= 1)   return "🌤️";
+  if (code <= 3)   return "⛅";
+  if (code <= 48)  return "🌫️";
+  if (code <= 57)  return "🌦️";
+  if (code <= 67)  return "🌧️";
+  if (code <= 77)  return "❄️";
+  if (code <= 82)  return "🌧️";
+  if (code <= 86)  return "🌨️";
+  return "⛈️";
+}
+
+function formatDate(dateStr) {
+  // "2025-05-15" → "May 15, 2025"
+  try {
+    return new Date(dateStr + "T12:00:00Z").toLocaleDateString("en-US", {
+      year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function WeatherBadge({ weather }) {
+  if (!weather) return null;
+  const icon = weatherIcon(weather.weather_code ?? 0);
+  return (
+    <div
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#2A3D2E]/8 text-sm"
+      style={{ fontFamily: "var(--font-inter)" }}
+    >
+      <span className="text-base leading-none">{icon}</span>
+      <span className="font-semibold text-[#2A3D2E]">
+        {weather.temperature_high}°F
+      </span>
+      <span className="text-[#2A3D2E]/40">·</span>
+      <span className="text-[#2A3D2E]/60">{weather.condition}</span>
+      {weather.precipitation_chance > 0 && (
+        <>
+          <span className="text-[#2A3D2E]/40">·</span>
+          <span className="text-[#2A3D2E]/50 text-xs">{weather.precipitation_chance}% rain</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Confidence badge ──────────────────────────────────────────────────────────
 function ConfidenceBadge({ level }) {
   const map = {
@@ -44,7 +94,6 @@ function ItemCard({ item, role, stylingNote }) {
             ✦
           </div>
         )}
-        {/* Role pill */}
         <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-[#2A3D2E]/70 text-white text-[10px] font-semibold capitalize backdrop-blur-sm">
           {role}
         </span>
@@ -68,7 +117,6 @@ function MissingItem({ item: { item, category, why, price_range } }) {
       className="flex items-start gap-4 py-4 border-b border-[#2A3D2E]/6 last:border-0"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      {/* Icon placeholder */}
       <div className="w-10 h-10 rounded-xl bg-[#2A3D2E]/6 flex-shrink-0 flex items-center justify-center text-[#2A3D2E]/30">
         <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -94,13 +142,13 @@ function MissingItem({ item: { item, category, why, price_range } }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function OutfitResultPage({ params }) {
-  const { id } = use(params);
+  const { id }  = use(params);
   const router  = useRouter();
 
   const [user,      setUser]      = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [outfit,    setOutfit]    = useState(null);
-  const [items,     setItems]     = useState({}); // itemId → enriched item
+  const [items,     setItems]     = useState({});
   const [loading,   setLoading]   = useState(true);
   const [notFound,  setNotFound]  = useState(false);
 
@@ -113,12 +161,11 @@ export default function OutfitResultPage({ params }) {
     });
   }, [router]);
 
-  // Fetch outfit + wardrobe items once auth is confirmed
+  // Fetch outfit + wardrobe items
   useEffect(() => {
     if (!authReady || !user) return;
 
     async function load() {
-      // Fetch the outfit row
       const { data: outfitRow, error: outfitErr } = await supabase
         .from("outfits")
         .select("*")
@@ -135,9 +182,8 @@ export default function OutfitResultPage({ params }) {
 
       setOutfit(outfitRow);
 
-      // Fetch wardrobe items referenced in the outfit
       const selectedItems = outfitRow.generated_outfit?.selected_items ?? [];
-      const itemIds = selectedItems.map((s) => s.item_id).filter(Boolean);
+      const itemIds       = selectedItems.map((s) => s.item_id).filter(Boolean);
 
       if (!itemIds.length) { setLoading(false); return; }
 
@@ -149,7 +195,6 @@ export default function OutfitResultPage({ params }) {
 
       if (!wardrobeRows?.length) { setLoading(false); return; }
 
-      // Batch sign URLs
       const { data: signed } = await supabase.storage
         .from("wardrobe")
         .createSignedUrls(wardrobeRows.map((r) => r.image_url), 3600);
@@ -158,11 +203,11 @@ export default function OutfitResultPage({ params }) {
         (signed ?? []).map(({ path, signedUrl }) => [path, signedUrl])
       );
 
-      const itemMap = Object.fromEntries(
-        wardrobeRows.map((r) => [r.id, { ...r, signedUrl: urlMap[r.image_url] ?? null }])
+      setItems(
+        Object.fromEntries(
+          wardrobeRows.map((r) => [r.id, { ...r, signedUrl: urlMap[r.image_url] ?? null }])
+        )
       );
-
-      setItems(itemMap);
       setLoading(false);
     }
 
@@ -192,11 +237,12 @@ export default function OutfitResultPage({ params }) {
     );
   }
 
-  const generated      = outfit.generated_outfit ?? {};
-  const selectedItems  = generated.selected_items ?? [];
-  const missingItems   = outfit.missing_items ?? [];
-  const confidence     = generated.confidence_level ?? outfit.confidence ?? "medium";
-  const reviewNeeded   = generated.human_review_recommended;
+  const generated     = outfit.generated_outfit ?? {};
+  const selectedItems = generated.selected_items ?? [];
+  const missingItems  = outfit.missing_items ?? [];
+  const confidence    = generated.confidence_level ?? outfit.confidence ?? "medium";
+  const reviewNeeded  = generated.human_review_recommended;
+  const weather       = outfit.weather ?? null;
 
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
@@ -214,20 +260,33 @@ export default function OutfitResultPage({ params }) {
             </p>
             <ConfidenceBadge level={confidence} />
           </div>
+
           <h1
             className="text-3xl md:text-4xl font-bold text-[#2A3D2E] leading-tight"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             {outfit.event_description}
           </h1>
+
+          {/* Location + date line */}
           {(outfit.location || outfit.date) && (
             <p className="mt-1.5 text-[#2A3D2E]/45 text-sm">
-              {[outfit.location, outfit.date].filter(Boolean).join(" · ")}
+              {[outfit.location, outfit.date ? formatDate(outfit.date) : null]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           )}
+
+          {/* Weather badge — shown when weather was fetched */}
+          {weather && (
+            <div className="mt-3">
+              <WeatherBadge weather={weather} />
+            </div>
+          )}
+
           {generated.overall_vibe && (
             <p className="mt-3 text-sm font-medium text-[#2A3D2E]/60 italic">
-              "{generated.overall_vibe}"
+              &ldquo;{generated.overall_vibe}&rdquo;
             </p>
           )}
         </header>
@@ -283,12 +342,45 @@ export default function OutfitResultPage({ params }) {
               </div>
             )}
 
-            {/* Human review note */}
+            {/* Weather context card */}
+            {weather && (
+              <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-6">
+                <h3
+                  className="text-base font-bold text-[#2A3D2E] mb-3"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  Dressed for the weather
+                </h3>
+                <div className="flex flex-col gap-2 text-sm text-[#2A3D2E]/65">
+                  <div className="flex justify-between">
+                    <span>High</span>
+                    <span className="font-semibold text-[#2A3D2E]">{weather.temperature_high}°F</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Low</span>
+                    <span className="font-semibold text-[#2A3D2E]">{weather.temperature_low}°F</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Conditions</span>
+                    <span className="font-semibold text-[#2A3D2E]">{weather.condition}</span>
+                  </div>
+                  {weather.precipitation_chance > 0 && (
+                    <div className="flex justify-between">
+                      <span>Rain chance</span>
+                      <span className="font-semibold text-[#2A3D2E]">{weather.precipitation_chance}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Stylist tip */}
             {reviewNeeded && (
               <div className="flex items-start gap-3 px-4 py-3.5 rounded-2xl border border-[#C9A87C]/30 bg-[#C9A87C]/6">
                 <span className="text-[#C9A87C] text-base mt-0.5">✦</span>
                 <p className="text-xs text-[#2A3D2E]/60 leading-relaxed">
-                  <span className="font-semibold text-[#2A3D2E]/75">Stylist tip:</span> Your closet is still growing. Adding more pieces will unlock better outfit matches.
+                  <span className="font-semibold text-[#2A3D2E]/75">Stylist tip:</span>{" "}
+                  Your closet is still growing. Adding more pieces will unlock better outfit matches.
                 </p>
               </div>
             )}

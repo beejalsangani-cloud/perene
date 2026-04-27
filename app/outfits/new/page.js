@@ -7,6 +7,7 @@ import DashboardNav from "@/app/components/DashboardNav";
 
 const QUOTES = [
   "Consulting your wardrobe…",
+  "Checking the forecast…",
   "Studying your style DNA…",
   "Pairing colours with intention…",
   "Curating the perfect silhouette…",
@@ -24,12 +25,10 @@ function LoadingOverlay() {
 
   return (
     <div className="fixed inset-0 z-50 bg-[#F5F1E8]/90 backdrop-blur-sm flex flex-col items-center justify-center gap-6">
-      {/* Spinner */}
       <div className="relative w-14 h-14">
         <div className="absolute inset-0 rounded-full border-2 border-[#2A3D2E]/10 border-t-[#C4E552] animate-spin" />
         <div className="absolute inset-2 rounded-full border-2 border-[#2A3D2E]/5 border-b-[#C9A87C] animate-spin [animation-direction:reverse] [animation-duration:1.5s]" />
       </div>
-      {/* Quote */}
       <p
         key={idx}
         className="text-sm font-medium text-[#2A3D2E]/60 animate-pulse"
@@ -42,7 +41,7 @@ function LoadingOverlay() {
 }
 
 export default function NewOutfitPage() {
-  const router = useRouter();
+  const router      = useRouter();
   const textareaRef = useRef(null);
 
   const [user,             setUser]             = useState(null);
@@ -83,13 +82,13 @@ export default function NewOutfitPage() {
 
     try {
       const res = await fetch("/api/outfits/generate", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.id,
+          userId:           user.id,
           eventDescription,
           location: location || undefined,
-          date: date || undefined,
+          date:     date     || undefined,
         }),
       });
 
@@ -108,6 +107,10 @@ export default function NewOutfitPage() {
       setGenerating(false);
     }
   }
+
+  // Compute the min/max for the date picker
+  const today = new Date().toISOString().split("T")[0];
+  const maxDate = new Date(Date.now() + 16 * 86_400_000).toISOString().split("T")[0];
 
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
@@ -151,33 +154,43 @@ export default function NewOutfitPage() {
             />
           </div>
 
-          {/* Optional fields */}
+          {/* Location + Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#2A3D2E]/50 uppercase tracking-widest mb-2">
-                Location <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(optional)</span>
+                Location{" "}
+                <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(optional)</span>
               </label>
               <input
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. New York, outdoor patio…"
+                placeholder="e.g. Miami, FL"
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/12 bg-white text-[#2A3D2E] placeholder-[#2A3D2E]/30 text-sm outline-none focus:border-[#C4E552] transition-colors"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#2A3D2E]/50 uppercase tracking-widest mb-2">
-                Date / time <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(optional)</span>
+                Date{" "}
+                <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(optional · enables live weather)</span>
               </label>
               <input
-                type="text"
+                type="date"
                 value={date}
+                min={today}
+                max={maxDate}
                 onChange={(e) => setDate(e.target.value)}
-                placeholder="e.g. Saturday evening, July…"
-                className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/12 bg-white text-[#2A3D2E] placeholder-[#2A3D2E]/30 text-sm outline-none focus:border-[#C4E552] transition-colors"
+                className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/12 bg-white text-[#2A3D2E] text-sm outline-none focus:border-[#C4E552] transition-colors"
               />
             </div>
           </div>
+
+          {/* Weather hint — shown when location filled but no date yet */}
+          {location && !date && (
+            <p className="text-xs text-[#C9A87C]/80 -mt-2">
+              Add a date to pull live weather for {location}.
+            </p>
+          )}
 
           {/* Error */}
           {error && (
@@ -197,7 +210,6 @@ export default function NewOutfitPage() {
           </button>
         </form>
 
-        {/* Subtle nudge if wardrobe is empty */}
         <p className="mt-10 text-xs text-[#2A3D2E]/35 leading-relaxed">
           Tip: the more items you add to your{" "}
           <a href="/wardrobe" className="underline underline-offset-2 hover:text-[#2A3D2E]/60 transition-colors">

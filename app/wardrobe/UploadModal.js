@@ -20,16 +20,28 @@ export const COLORS = [
   { id: "Other",   hex: "#C8C0B0" },
 ];
 
+// Small "AI detected" pill shown next to section labels
+function AiBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#C4E552]/30 text-[#2A3D2E] text-[10px] font-semibold">
+      ✦ AI
+    </span>
+  );
+}
+
 export default function UploadModal({ isOpen, onClose, onSaved, user, editItem = null }) {
-  const [file,     setFile]     = useState(null);
-  const [preview,  setPreview]  = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const [category, setCategory] = useState("");
-  const [color,    setColor]    = useState("");
-  const [season,   setSeason]   = useState([]);
-  const [notes,    setNotes]    = useState("");
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState("");
+  const [file,        setFile]        = useState(null);
+  const [preview,     setPreview]     = useState(null);
+  const [dragging,    setDragging]    = useState(false);
+  const [category,    setCategory]    = useState("");
+  const [color,       setColor]       = useState("");
+  const [season,      setSeason]      = useState([]);
+  const [notes,       setNotes]       = useState("");
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState("");
+  const [analyzing,   setAnalyzing]   = useState(false);
+  // tracks which fields were last filled by AI (cleared on manual interaction)
+  const [aiFields,    setAiFields]    = useState({ category: false, color: false, season: false });
   const fileInputRef = useRef(null);
 
   // Seed form when switching between create / edit
@@ -50,9 +62,65 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
     }
     setError("");
     setSaving(false);
+    setAnalyzing(false);
+    setAiFields({ category: false, color: false, season: false });
   }, [editItem, isOpen]);
 
   if (!isOpen) return null;
+
+  // ── AI analysis ───────────────────────────────────────────────────────────
+  async function analyzeImage(f) {
+    setAnalyzing(true);
+    try {
+      // Compress to a small size just for analysis (keeps payload small)
+      let small;
+      try {
+        small = await imageCompression(f, { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true });
+      } catch {
+        small = f;
+      }
+
+      // Convert to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(small);
+      });
+
+      const res = await fetch("/api/wardrobe/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType: small.type || "image/jpeg" }),
+      });
+
+      if (!res.ok) throw new Error("Analysis request failed");
+
+      const { category: detCat, color: detColor, seasons: detSeasons } = await res.json();
+
+      const suggested = { category: false, color: false, season: false };
+
+      if (detCat) {
+        setCategory(detCat);
+        suggested.category = true;
+      }
+      if (detColor) {
+        setColor(detColor);
+        suggested.color = true;
+      }
+      if (detSeasons?.length) {
+        setSeason(detSeasons);
+        suggested.season = true;
+      }
+
+      setAiFields(suggested);
+    } catch (err) {
+      console.error("[UploadModal] analyze error:", err);
+      // Fail silently — user fills fields manually
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   // ── File helpers ──────────────────────────────────────────────────────────
   function pickFile(f) {
@@ -62,10 +130,17 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setError("");
+    // Reset manual fields + kick off AI analysis
+    setCategory("");
+    setColor("");
+    setSeason([]);
+    setAiFields({ category: false, color: false, season: false });
+    analyzeImage(f);
   }
 
   function toggleSeason(s) {
     setSeason((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+    setAiFields((prev) => ({ ...prev, season: false }));
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -78,7 +153,6 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
 
     let imagePath = editItem?.image_url ?? null;
 
-    // Upload new image if one was selected
     if (file) {
       let compressed;
       try {
@@ -88,12 +162,12 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
           useWebWorker: true,
         });
       } catch {
-        compressed = file; // fall back to original if compression fails
+        compressed = file;
       }
 
-      const ext = (compressed.type || "image/jpeg").split("/")[1] || "jpg";
+      const ext    = (compressed.type || "image/jpeg").split("/")[1] || "jpg";
       const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      imagePath = `${user.id}/${suffix}.${ext}`;
+      imagePath    = `${user.id}/${suffix}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from("wardrobe")
@@ -105,13 +179,11 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
         return;
       }
 
-      // Remove old image from storage when replacing
       if (editItem?.image_url) {
         await supabase.storage.from("wardrobe").remove([editItem.image_url]);
       }
     }
 
-    // Persist metadata to DB
     const payload = { image_url: imagePath, category, color, season, notes };
     let savedRow, dbErr;
 
@@ -145,10 +217,7 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
       style={{ fontFamily: "var(--font-inter)" }}
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-[#2A3D2E]/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-[#2A3D2E]/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal card */}
       <div className="relative w-full sm:max-w-lg bg-[#F5F1E8] rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
@@ -175,13 +244,27 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview} alt="Preview" className="w-full h-full object-cover" />
               </div>
-              <button
-                type="button"
-                onClick={() => { setFile(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                className="absolute top-2 right-2 px-3 py-1 rounded-full bg-white/90 text-[#2A3D2E] text-xs font-semibold shadow-sm hover:bg-white transition-colors cursor-pointer"
-              >
-                Replace
-              </button>
+              {/* Analyzing overlay */}
+              {analyzing && (
+                <div className="absolute inset-0 rounded-2xl bg-[#2A3D2E]/40 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-[#C4E552] rounded-full animate-spin" />
+                  <p className="text-white text-xs font-semibold">Detecting details…</p>
+                </div>
+              )}
+              {!analyzing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    setPreview(null);
+                    setAiFields({ category: false, color: false, season: false });
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="absolute top-2 right-2 px-3 py-1 rounded-full bg-white/90 text-[#2A3D2E] text-xs font-semibold shadow-sm hover:bg-white transition-colors cursor-pointer"
+                >
+                  Replace
+                </button>
+              )}
             </div>
           ) : (
             <div
@@ -211,12 +294,14 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
 
           {/* ── Category ──────────────────────────────────────────────── */}
           <div>
-            <label className="block text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
               Category
+              {aiFields.category && <AiBadge />}
             </label>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((c) => (
-                <button key={c} type="button" onClick={() => setCategory(c)}
+                <button key={c} type="button"
+                  onClick={() => { setCategory(c); setAiFields((p) => ({ ...p, category: false })); }}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                     category === c
                       ? "bg-[#2A3D2E] border-[#2A3D2E] text-[#F5F1E8]"
@@ -231,12 +316,14 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
 
           {/* ── Primary colour ────────────────────────────────────────── */}
           <div>
-            <label className="block text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
               Primary colour
+              {aiFields.color && <AiBadge />}
             </label>
             <div className="flex flex-wrap gap-2.5 items-center">
               {COLORS.map(({ id, hex }) => (
-                <button key={id} type="button" title={id} onClick={() => setColor(id)}
+                <button key={id} type="button" title={id}
+                  onClick={() => { setColor(id); setAiFields((p) => ({ ...p, color: false })); }}
                   className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex-shrink-0 ${
                     color === id
                       ? "border-[#2A3D2E] scale-110 shadow-sm"
@@ -255,8 +342,10 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
 
           {/* ── Season ────────────────────────────────────────────────── */}
           <div>
-            <label className="block text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
-              Season <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(select all that apply)</span>
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#2A3D2E]/55 uppercase tracking-widest mb-2">
+              Season
+              <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/35">(select all that apply)</span>
+              {aiFields.season && <AiBadge />}
             </label>
             <div className="flex flex-wrap gap-2">
               {SEASONS.map((s) => (
@@ -301,10 +390,10 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
             >
               Cancel
             </button>
-            <button type="submit" disabled={saving}
+            <button type="submit" disabled={saving || analyzing}
               className="flex-1 py-3 rounded-xl bg-[#C4E552] text-[#2A3D2E] text-sm font-bold hover:bg-[#d4f562] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              {saving ? "Saving…" : editItem ? "Save changes" : "Add to closet"}
+              {saving ? "Saving…" : analyzing ? "Detecting…" : editItem ? "Save changes" : "Add to closet"}
             </button>
           </div>
         </form>

@@ -172,31 +172,23 @@ export default function QuizPage() {
     }
   }
 
-  // ── Save to Supabase ─────────────────────────────────────────────────────────
+  // ── Save to Supabase (via server API route) ──────────────────────────────────
   async function saveProfile() {
     setSaving(true);
     setSaveError("");
 
-    const { error } = await supabase.from("user_profiles").upsert(
-      {
-        user_id: user.id,
-        gender: answers.gender ?? null,
-        age_range: answers.age_range ?? null,
-        body_type: answers.body_type ?? null,
-        style_descriptors: answers.style_descriptors ?? [],
-        lifestyle: answers.lifestyle ?? [],
-        typical_events: answers.typical_events ?? [],
-        budget_range: answers.budget_range ?? null,
-        color_preferences: answers.color_preferences ?? [],
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
+    const res = await fetch("/api/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, answers }),
+    });
 
+    const data = await res.json();
     setSaving(false);
 
-    if (error) {
-      setSaveError("Something went wrong saving your profile. Please try again.");
+    if (!res.ok) {
+      console.error("[quiz] save failed:", data);
+      setSaveError(`Save failed: ${data.error ?? "unknown error"} (code: ${data.code ?? "?"})`);
       return;
     }
 

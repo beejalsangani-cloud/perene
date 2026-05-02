@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import Anthropic from "@anthropic-ai/sdk";
+import { RETAILER_PROMPT_LINES, findRetailer } from "@/lib/affiliate";
 
 // ── Weather helpers ───────────────────────────────────────────────────────────
 
@@ -75,6 +76,37 @@ async function fetchWeather(location, dateStr) {
     console.error("[outfits/generate] weather fetch error:", err);
     return null;
   }
+}
+
+// ── Retailer suggestion sanitization ──────────────────────────────────────────
+// Drop unknown retailer names, dedupe, cap at 3, canonicalize casing/accents.
+function sanitizeRetailers(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out  = [];
+  for (const r of raw) {
+    if (!r || typeof r.search_query !== "string") continue;
+    const canonical = findRetailer(r.name);
+    if (!canonical) continue;
+    if (seen.has(canonical.name)) continue;
+    const query = r.search_query.trim();
+    if (!query) continue;
+    seen.add(canonical.name);
+    out.push({ name: canonical.name, search_query: query });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function sanitizeMissingItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((m) => ({
+    item:        m?.item        ?? "",
+    category:    m?.category    ?? "",
+    why:         m?.why         ?? "",
+    price_range: m?.price_range ?? "",
+    retailers:   sanitizeRetailers(m?.retailers),
+  }));
 }
 
 function formatDateForPrompt(dateStr) {
@@ -164,6 +196,9 @@ ${profileLines.join("\n")}
 WARDROBE (${items.length} item${items.length === 1 ? "" : "s"}):
 ${wardrobeLines.join("\n")}
 
+RETAILER ROSTER — for each missing_item, pick 2–3 retailers from this list ranked by aesthetic match first, price fit second:
+${RETAILER_PROMPT_LINES.join("\n")}
+
 Return exactly this JSON structure:
 {
   "selected_items": [
@@ -172,7 +207,15 @@ Return exactly this JSON structure:
   "styling_reasoning": "<2–3 sentences describing the overall look and why it suits the occasion>",
   "overall_vibe": "<3–5 words e.g. 'relaxed coastal chic'>",
   "missing_items": [
-    { "item": "<item name>", "category": "<category>", "why": "<why it would elevate the look>", "price_range": "<e.g. $50–$150>" }
+    {
+      "item": "<item name>",
+      "category": "<category>",
+      "why": "<why it would elevate the look>",
+      "price_range": "<e.g. $50–$150>",
+      "retailers": [
+        { "name": "<exact name from the roster above>", "search_query": "<2–6 keywords a shopper would type>" }
+      ]
+    }
   ],
   "confidence_level": "<high|medium|low>",
   "human_review_recommended": <true|false>
@@ -182,6 +225,10 @@ Rules:
 - Only use item_ids that appear in the wardrobe list above
 - If wardrobe is empty, selected_items must be []
 - List 1–3 missing_items that would complete or elevate the look
+- Each missing_item must include 2–3 retailers from the roster, ordered best match first
+- Retailer "name" must be spelled exactly as in the roster (e.g. "Saks Fifth Avenue", "Sézane", "Net-a-Porter")
+- "search_query" is 2–6 plain keywords (no brand names, no quotes, no punctuation)
+- Match retailer to item type: Mejuri only for jewelry; Madewell for casual/denim; Net-a-Porter and Saks Fifth Avenue for luxury investment pieces
 - confidence_level is "high" when every key role is filled, "medium" when 1–2 are missing, "low" when wardrobe is very sparse
 - human_review_recommended is true when confidence_level is "low" or wardrobe has < 3 items`;
 
@@ -192,7 +239,7 @@ Rules:
   try {
     message = await client.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 1024,
+      max_tokens: 1500,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     });
@@ -228,7 +275,7 @@ Rules:
         confidence_level:         parsed.confidence_level         ?? "medium",
         human_review_recommended: parsed.human_review_recommended ?? false,
       },
-      missing_items: parsed.missing_items ?? [],
+      missing_items: sanitizeMissingItems(parsed.missing_items),
       confidence:    parsed.confidence_level ?? "medium",
     })
     .select()

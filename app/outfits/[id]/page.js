@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 import WeatherIcon from "@/app/components/WeatherIcon";
+import { buildShopUrl, OUTBOUND_LINK_REL } from "@/lib/affiliate";
 
 // ── Weather card (prominent, full-width) ──────────────────────────────────────
 
@@ -122,7 +123,13 @@ function ItemCard({ item, role, stylingNote }) {
 }
 
 // ── Missing item row ──────────────────────────────────────────────────────────
-function MissingItem({ item: { item, category, why, price_range } }) {
+function MissingItem({ item: { item, category, why, price_range, retailers } }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const shopLinks = (retailers ?? [])
+    .map((r) => ({ name: r.name, url: buildShopUrl({ retailer: r.name, query: r.search_query }) }))
+    .filter((r) => r.url);
+
   return (
     <div className="flex items-start gap-4 py-4 border-b border-[#2A3D2E]/6 last:border-0"
       style={{ fontFamily: "var(--font-inter)" }}>
@@ -138,6 +145,46 @@ function MissingItem({ item: { item, category, why, price_range } }) {
           {price_range && <span className="text-[11px] text-[#C9A87C] font-medium">{price_range}</span>}
         </div>
         {why && <p className="text-xs text-[#2A3D2E]/50 mt-0.5 leading-relaxed">{why}</p>}
+
+        {shopLinks.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] transition-colors"
+            >
+              Shop the look
+              <svg viewBox="0 0 12 12" fill="none"
+                className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`}>
+                <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {expanded && (
+              <div className="mt-3 flex flex-col gap-1.5">
+                {shopLinks.map((r) => (
+                  <a
+                    key={r.name}
+                    href={r.url}
+                    target="_blank"
+                    rel={OUTBOUND_LINK_REL}
+                    className="group inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#2A3D2E]/10 hover:border-[#C9A87C]/45 bg-white transition-colors"
+                  >
+                    <span className="text-xs font-medium text-[#2A3D2E]">{r.name}</span>
+                    <svg viewBox="0 0 12 12" fill="none"
+                      className="w-3 h-3 text-[#2A3D2E]/30 group-hover:text-[#C9A87C] transition-colors">
+                      <path d="M3.5 8.5l5-5M4 3.5h4.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </a>
+                ))}
+                <p className="mt-1 text-[10px] italic text-[#2A3D2E]/45">
+                  Affiliate links — Perene may earn a commission.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

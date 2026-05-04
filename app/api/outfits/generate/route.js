@@ -228,7 +228,18 @@ Rules:
 - Each missing_item must include 2–3 retailers from the roster, ordered best match first
 - Retailer "name" must be spelled exactly as in the roster (e.g. "Saks Fifth Avenue", "Sézane", "Net-a-Porter")
 - "search_query" is 2–6 plain keywords (no brand names, no quotes, no punctuation)
-- Match retailer to item type: Mejuri only for jewelry; Madewell for casual/denim; Net-a-Porter and Saks Fifth Avenue for luxury investment pieces
+- Match retailer to item type — each retailer is narrow, respect the fit:
+  - Mejuri: jewelry only; never clothing, shoes, or bags
+  - Reformation: dresses, romantic tops, occasion pieces; never blazers, suits, workwear, or heavy outerwear
+  - Free People: boho, festival, casual layers; never formal/black-tie or polished workwear
+  - Anthropologie: bohemian-eclectic, romantic, occasion-friendly; avoid streetwear or athletic pieces
+  - Net-a-Porter and Saks Fifth Avenue: luxury/designer investment pieces only ($300+); never for items the user wants under $200
+  - Aritzia: elevated minimalist contemporary basics, workwear, knits; avoid boho, festival, or super-formal occasion wear
+  - Sézane: French-girl polished casual, knits, blouses; avoid athletic, streetwear, or boho
+  - Revolve: contemporary trend-forward going-out clothes, dresses, statement pieces; avoid minimalist basics or workwear
+  - Nordstrom: broad department-store fallback; strong for shoes, denim, mainstream brands; use as default when nothing else fits
+  - ASOS: trendy, younger price points, fast-fashion-adjacent; use for trend pieces under $150
+- If no retailer confidently fits an item, prefer 1–2 strong matches over forcing a third weak one — 2 confident retailers beat 3 with one that won't carry the item
 - confidence_level is "high" when every key role is filled, "medium" when 1–2 are missing, "low" when wardrobe is very sparse
 - human_review_recommended is true when confidence_level is "low" or wardrobe has < 3 items`;
 

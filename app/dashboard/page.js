@@ -9,7 +9,8 @@ import WeatherWidget from "@/app/components/WeatherWidget";
 import LocationSetup from "@/app/components/LocationSetup";
 import InspirationFeed from "@/app/components/InspirationFeed";
 import StyleTips from "@/app/components/StyleTips";
-import WeeklyCalendar from "@/app/components/WeeklyCalendar";
+// 2026-05-04: WeeklyCalendar card hidden on dashboard. Component file + weather APIs remain; re-enable by uncommenting this import and the JSX block below.
+// import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -344,10 +345,10 @@ export default function DashboardPage() {
         {!profileLoading && user && (
           <div className="mt-10 flex flex-col gap-10">
 
-            {/* Weekly Calendar */}
-            {showWeather && (
+            {/* 2026-05-04: 7-day forecast card hidden. Weather API + outfit recommender data layer remain active. */}
+            {/* {showWeather && (
               <WeeklyCalendar defaultLocation={defaultLocation}/>
-            )}
+            )} */}
 
             {/* Tips + (future) saved looks — 2-col on large screens */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

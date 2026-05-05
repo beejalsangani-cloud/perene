@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 import UploadModal, { COLORS } from "./UploadModal";
@@ -28,8 +29,8 @@ function ItemCard({ item, onEdit, onDelete, deleting }) {
           </div>
         )}
 
-        {/* Hover action overlay */}
-        <div className="absolute inset-0 bg-[#2A3D2E]/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+        {/* Hover action overlay (desktop only — touch devices use the action row below) */}
+        <div className="hidden sm:flex absolute inset-0 bg-[#2A3D2E]/55 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
           <button
             onClick={() => onEdit(item)}
             className="px-4 py-2 rounded-full bg-[#F5F1E8] text-[#2A3D2E] text-xs font-bold hover:bg-white transition-colors cursor-pointer"
@@ -69,6 +70,23 @@ function ItemCard({ item, onEdit, onDelete, deleting }) {
             {item.season.join(", ")}
           </span>
         )}
+      </div>
+
+      {/* Mobile action row — hover overlay isn't reachable on touch devices */}
+      <div className="sm:hidden flex gap-2 px-3 pb-3" style={{ fontFamily: "var(--font-inter)" }}>
+        <button
+          onClick={() => onEdit(item)}
+          className="flex-1 px-3 py-3 rounded-lg border border-[#2A3D2E]/15 text-[#2A3D2E]/80 text-sm font-semibold hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] transition-colors cursor-pointer"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => onDelete(item)}
+          disabled={deleting === item.id}
+          className="flex-1 px-3 py-3 rounded-lg border border-[#E84848]/30 text-[#E84848]/85 text-sm font-semibold hover:border-[#E84848]/55 hover:text-[#E84848] transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {deleting === item.id ? "…" : "Delete"}
+        </button>
       </div>
     </div>
   );
@@ -217,7 +235,7 @@ export default function WardrobePage() {
       <main className="max-w-6xl mx-auto px-6 md:px-10 py-10 md:py-14" style={{ fontFamily: "var(--font-inter)" }}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className="flex items-end justify-between mb-10 gap-4">
+        <div className="flex flex-col items-start sm:flex-row sm:items-end sm:justify-between mb-10 gap-4">
           <div>
             <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest mb-2">
               Your wardrobe
@@ -234,12 +252,20 @@ export default function WardrobePage() {
             </p>
           </div>
           {(items === null || count > 0) && (
-            <button
-              onClick={openCreate}
-              className="flex-shrink-0 px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] active:scale-95 transition-all cursor-pointer"
-            >
-              + Add new item
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/outfits/new"
+                className="px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] active:scale-95 transition-all"
+              >
+                Generate an outfit →
+              </Link>
+              <button
+                onClick={openCreate}
+                className="px-5 py-3 rounded-full border border-[#2A3D2E]/15 text-[#2A3D2E]/65 font-bold text-sm hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] active:scale-95 transition-all cursor-pointer"
+              >
+                + Add new item
+              </button>
+            </div>
           )}
         </div>
 

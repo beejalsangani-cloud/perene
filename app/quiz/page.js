@@ -251,7 +251,7 @@ export default function QuizPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-[#2A3D2E]/8 p-8 md:p-10">
+        <div className="bg-white rounded-2xl shadow-sm border border-[#2A3D2E]/8 p-6 md:p-10">
           {/* Question */}
           <h2
             className="text-2xl md:text-3xl font-bold text-[#2A3D2E] mb-2 leading-snug"
@@ -292,7 +292,7 @@ export default function QuizPage() {
               type="button"
               onClick={goBack}
               disabled={step === 0}
-              className="px-5 py-2.5 rounded-xl border-2 border-[#2A3D2E]/15 text-[#2A3D2E]/60 text-sm font-semibold hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+              className="px-5 py-3 rounded-xl border-2 border-[#2A3D2E]/15 text-[#2A3D2E]/60 text-sm font-semibold hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
             >
               ← Back
             </button>
@@ -302,7 +302,7 @@ export default function QuizPage() {
                 <button
                   type="button"
                   onClick={goNext}
-                  className="text-sm text-[#2A3D2E]/45 hover:text-[#2A3D2E]/70 transition-colors underline underline-offset-2 cursor-pointer"
+                  className="px-2 py-3 text-sm text-[#2A3D2E]/45 hover:text-[#2A3D2E]/70 transition-colors underline underline-offset-2 cursor-pointer"
                 >
                   Skip for now
                 </button>
@@ -311,7 +311,7 @@ export default function QuizPage() {
                 type="button"
                 onClick={goNext}
                 disabled={!canAdvance() || saving}
-                className="px-6 py-2.5 rounded-xl bg-[#C4E552] text-[#2A3D2E] font-bold text-sm tracking-wide hover:bg-[#d4f562] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-[#C4E552] text-[#2A3D2E] font-bold text-sm tracking-wide hover:bg-[#d4f562] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving
                   ? "Saving…"

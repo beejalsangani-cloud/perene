@@ -1,4 +1,3 @@
-import WaitlistForm from "./components/WaitlistForm";
 import Navbar from "./components/Navbar";
 import Wordmark from "./components/Wordmark";
 
@@ -66,7 +65,13 @@ function Hero() {
           </p>
 
           <div className="relative">
-            <WaitlistForm variant="hero" />
+            <a
+              href="/signup"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-base tracking-wide hover:bg-[#d4f562] active:scale-95 transition-all shadow-sm"
+              style={{ fontFamily: "var(--font-inter)" }}
+            >
+              Sign Up Free →
+            </a>
             <p
               className="mt-3 text-sm text-white/60"
               style={{ fontFamily: "var(--font-inter)" }}
@@ -299,10 +304,10 @@ function Features() {
   );
 }
 
-// ── Waitlist CTA ──────────────────────────────────────────────────────────────
-function WaitlistCTA() {
+// ── Sign-up CTA ───────────────────────────────────────────────────────────────
+function SignUpCTA() {
   return (
-    <section id="waitlist" className="py-24 md:py-32 px-6 md:px-12 bg-[#EDE7D6]">
+    <section id="signup" className="py-24 md:py-32 px-6 md:px-12 bg-[#EDE7D6]">
       <div className="max-w-2xl mx-auto text-center">
         {/* Ornament */}
         <div className="flex items-center justify-center gap-4 mb-10">
@@ -315,7 +320,7 @@ function WaitlistCTA() {
           className="text-[#C9A87C] text-sm font-medium tracking-widest uppercase mb-4"
           style={{ fontFamily: "var(--font-inter)" }}
         >
-          Join the Waitlist
+          Get Started
         </p>
         <h2
           className="text-4xl md:text-5xl font-bold text-[#2A3D2E] leading-tight mb-6"
@@ -333,17 +338,22 @@ function WaitlistCTA() {
           <span className="font-semibold text-[#2A3D2E]">
             free while we&apos;re in early access
           </span>
-          . Be among the first to experience AI-powered personal styling — and
-          help shape the product.
+          . Sign up to start building your AI-styled wardrobe in minutes.
         </p>
 
-        <WaitlistForm variant="cta" />
+        <a
+          href="/signup"
+          className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-base tracking-wide hover:bg-[#d4f562] active:scale-95 transition-all shadow-sm"
+          style={{ fontFamily: "var(--font-inter)" }}
+        >
+          Sign Up Free →
+        </a>
 
         <p
           className="mt-5 text-sm text-[#2A3D2E]/40"
           style={{ fontFamily: "var(--font-inter)" }}
         >
-          No spam. No credit card. Unsubscribe anytime.
+          Free while in early access. No credit card required.
         </p>
       </div>
     </section>
@@ -385,7 +395,7 @@ export default function Home() {
         <Hero />
         <HowItWorks />
         <Features />
-        <WaitlistCTA />
+        <SignUpCTA />
       </main>
       <Footer />
     </>

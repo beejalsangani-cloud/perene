@@ -6,7 +6,6 @@ import Wordmark from "./Wordmark";
 const LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Features", href: "#features" },
-  { label: "Join Waitlist", href: "#waitlist" },
 ];
 
 export default function Navbar() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
@@ -34,7 +34,7 @@ function LoadingOverlay() {
   );
 }
 
-export default function NewOutfitPage() {
+function NewOutfitContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const textareaRef  = useRef(null);
@@ -202,5 +202,22 @@ export default function NewOutfitPage() {
         </p>
       </main>
     </div>
+  );
+}
+
+// useSearchParams() opts the route into client-side rendering, so the page
+// must be wrapped in <Suspense> for the prerender pass to succeed.
+// https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+export default function NewOutfitPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#F5F1E8] flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#2A3D2E]/15 border-t-[#C4E552] rounded-full animate-spin"/>
+        </main>
+      }
+    >
+      <NewOutfitContent />
+    </Suspense>
   );
 }

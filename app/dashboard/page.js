@@ -14,16 +14,25 @@ import StyleTips from "@/app/components/StyleTips";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getFirstName(user) {
+function getFirstName(user, profile) {
+  // 1. Source of truth: user_profiles.first_name (set at signup)
+  const stored = profile?.first_name?.trim();
+  if (stored) return stored;
+
+  // 2. Fallback: Supabase user_metadata (legacy / OAuth flows)
   const meta = user?.user_metadata;
   if (meta?.full_name) return meta.full_name.split(" ")[0];
   if (meta?.name)      return meta.name.split(" ")[0];
+
+  // 3. Fallback: prettified email local part
   const prefix = user?.email?.split("@")[0];
   if (prefix) {
     const clean = prefix.replace(/[._\-+]/g, " ").split(" ")[0];
     return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
-  return "stylist";
+
+  // 4. Final fallback: full email, or "stylist" if even that's missing
+  return user?.email ?? "stylist";
 }
 
 const SWATCH = {
@@ -227,7 +236,7 @@ export default function DashboardPage() {
     );
   }
 
-  const firstName     = getFirstName(user);
+  const firstName     = getFirstName(user, profile);
   const profileLoading = profile === undefined;
   // Show location setup when profile has loaded and there's no saved location
   const showLocationSetup = defaultLocation === null;

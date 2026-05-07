@@ -8,9 +8,11 @@ import Wordmark from "@/app/components/Wordmark";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [optIn, setOptIn] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
@@ -34,12 +36,40 @@ export default function SignupPage() {
       password,
       options: { emailRedirectTo: `${window.location.origin}/quiz` },
     });
-    setLoading(false);
 
     if (authError) {
+      setLoading(false);
       setError(authError.message);
       return;
     }
+
+    // Persist optional first_name + opt-in to user_profiles. Server-side
+    // (service role) so it works even when email confirmation is on. Failures
+    // are non-blocking — the user proceeds to /quiz or the inbox screen
+    // regardless.
+    if (data.user?.id) {
+      fetch("/api/auth/post-signup", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId:         data.user.id,
+          firstName,
+          marketingOptIn: optIn,
+        }),
+      }).catch((err) => console.error("[signup] post-signup sync failed:", err));
+
+      // Best-effort Mailchimp sync — only if the user opted in. Failures are
+      // silent; signup completes regardless.
+      if (optIn) {
+        fetch("/api/waitlist", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, firstName }),
+        }).catch((err) => console.error("[signup] mailchimp sync failed:", err));
+      }
+    }
+
+    setLoading(false);
 
     // If Supabase returns a session immediately, email confirmation is off → go straight to quiz
     if (data.session) {
@@ -122,6 +152,20 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#2A3D2E]/70 uppercase tracking-wider mb-1.5">
+                First name{" "}
+                <span className="normal-case tracking-normal font-normal text-[#2A3D2E]/40">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="What should we call you?"
+                autoComplete="given-name"
+                className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/15 bg-white text-[#2A3D2E] placeholder-[#2A3D2E]/30 outline-none focus:border-[#C4E552] transition-colors text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#2A3D2E]/70 uppercase tracking-wider mb-1.5">
                 Email
               </label>
               <input
@@ -159,6 +203,20 @@ export default function SignupPage() {
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/15 bg-white text-[#2A3D2E] placeholder-[#2A3D2E]/30 outline-none focus:border-[#C4E552] transition-colors text-sm"
               />
             </div>
+
+            {/* Marketing opt-in — unchecked by default. Whole label area is tappable */}
+            <label className="flex items-start gap-3 py-2 -my-1 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={optIn}
+                onChange={(e) => setOptIn(e.target.checked)}
+                className="mt-0.5 w-5 h-5 rounded border-2 border-[#2A3D2E]/25 bg-white accent-[#C4E552] cursor-pointer flex-shrink-0"
+              />
+              <span className="text-sm text-[#2A3D2E]/75 leading-relaxed group-hover:text-[#2A3D2E] transition-colors">
+                Send me styling tips and updates from Perene.{" "}
+                <span className="text-[#2A3D2E]/40">(optional)</span>
+              </span>
+            </label>
 
             {error && (
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#F5F1E8] border border-[#2A3D2E]/15">

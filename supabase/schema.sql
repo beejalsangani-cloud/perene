@@ -50,3 +50,9 @@ create policy "users: insert own profile"
 create policy "users: update own profile"
   on public.user_profiles for update
   using (auth.uid() = user_id);
+
+-- ── 2026-05-07: signup-time first name + marketing opt-in ─────────────────────
+-- Both nullable / defaulted so existing rows aren't disrupted.
+alter table public.user_profiles
+  add column if not exists first_name        text,
+  add column if not exists marketing_opt_in  boolean default false;

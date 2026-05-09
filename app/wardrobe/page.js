@@ -185,6 +185,19 @@ export default function WardrobePage() {
     if (authReady && user) loadItems(user.id);
   }, [authReady, user, loadItems]);
 
+  // Hash-based auto-open: /wardrobe#upload lands the user directly in the
+  // upload modal. Used by /welcome and the dashboard soft-gate banner so the
+  // path from "I should add an item" to "the camera is open" is one tap.
+  useEffect(() => {
+    if (!authReady) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#upload") return;
+    setEditItem(null);
+    setModalOpen(true);
+    // Strip the hash so a manual reload doesn't re-open the modal.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [authReady]);
+
   // ── Delete ──────────────────────────────────────────────────────────────────
   async function handleDelete(item) {
     if (!confirm(`Delete this ${item.category ?? "item"}? This can't be undone.`)) return;
@@ -253,12 +266,23 @@ export default function WardrobePage() {
           </div>
           {(items === null || count > 0) && (
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/outfits/new"
-                className="px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] active:scale-95 transition-all"
-              >
-                Generate an outfit →
-              </Link>
+              {items === null || count >= 5 ? (
+                <Link
+                  href="/outfits/new"
+                  className="px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] active:scale-95 transition-all"
+                >
+                  Generate an outfit →
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="Add at least 5 items to start generating outfits"
+                  className="px-5 py-3 rounded-full bg-[#2A3D2E]/8 text-[#2A3D2E]/45 font-bold text-sm cursor-not-allowed"
+                >
+                  Generate an outfit →
+                </button>
+              )}
               <button
                 onClick={openCreate}
                 className="px-5 py-3 rounded-full border border-[#2A3D2E]/15 text-[#2A3D2E]/65 font-bold text-sm hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] active:scale-95 transition-all cursor-pointer"

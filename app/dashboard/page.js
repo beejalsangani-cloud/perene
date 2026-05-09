@@ -166,7 +166,7 @@ function ProfileCard({ profile }) {
   );
 }
 
-function FeatureTile({ icon, title, stat, cta, href, disabled = false }) {
+function FeatureTile({ icon, title, stat, cta, href, disabled = false, disabledLabel = "Coming soon", disabledTitle }) {
   return (
     <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-7 flex flex-col gap-5"
       style={{ fontFamily: "var(--font-inter)" }}>
@@ -178,8 +178,9 @@ function FeatureTile({ icon, title, stat, cta, href, disabled = false }) {
         <p className="text-sm text-[#2A3D2E]/50">{stat}</p>
       </div>
       {disabled ? (
-        <span className="mt-auto inline-flex items-center px-4 py-2 rounded-full bg-[#2A3D2E]/6 text-[#2A3D2E]/35 text-xs font-semibold cursor-not-allowed">
-          Coming soon
+        <span title={disabledTitle}
+          className="mt-auto inline-flex items-center px-4 py-2 rounded-full bg-[#2A3D2E]/6 text-[#2A3D2E]/35 text-xs font-semibold cursor-not-allowed self-start">
+          {disabledLabel}
         </span>
       ) : (
         <Link href={href}
@@ -221,10 +222,20 @@ export default function DashboardPage() {
       supabase.from("wardrobe_items").select("*", { count: "exact", head: true }).eq("user_id", user.id),
     ]).then(([profileRes, countRes]) => {
       if (profileRes.error) console.error("[dashboard] profile fetch error:", profileRes.error);
+      const count = countRes.count ?? 0;
+
+      // First-time-user gate: empty closet → /welcome.
+      // Honour the per-tab "Skip for now" flag so users who explicitly skipped
+      // aren't bounced back into the welcome screen.
+      if (count === 0 && typeof window !== "undefined" && sessionStorage.getItem("welcomeSkipped") !== "1") {
+        router.replace("/welcome");
+        return;
+      }
+
       const p = profileRes.data ?? null;
       setProfile(p);
       setDefaultLocation(p?.default_location ?? null); // null = no location set yet
-      setWardrobeCount(countRes.count ?? 0);
+      setWardrobeCount(count);
     });
   }, [authReady, user]);
 
@@ -242,6 +253,9 @@ export default function DashboardPage() {
   const showLocationSetup = defaultLocation === null;
   // Show weather widget once we have a location
   const showWeather = defaultLocation != null && defaultLocation !== undefined;
+  // Soft gate: Outfit Generator is locked until the user has at least 5 closet items.
+  // Don't gate while count is still loading (null) — avoids flashing "0 more to unlock".
+  const outfitGated = wardrobeCount !== null && wardrobeCount < 5;
 
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
@@ -264,6 +278,30 @@ export default function DashboardPage() {
             Here&apos;s your style at a glance.
           </p>
         </header>
+
+        {/* ── Soft-gate banner (1–4 items in closet) ─────────────────── */}
+        {wardrobeCount !== null && wardrobeCount > 0 && wardrobeCount < 5 && (
+          <div
+            className="mb-8 flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4 rounded-2xl border border-[#C9A87C]/30 bg-[#C9A87C]/8"
+            style={{ fontFamily: "var(--font-inter)" }}
+          >
+            <div className="flex items-start gap-3 flex-1">
+              <span className="text-[#C9A87C] text-base flex-shrink-0">✦</span>
+              <p className="text-sm text-[#2A3D2E]/75 leading-relaxed">
+                <span className="font-semibold text-[#2A3D2E]">
+                  Add {5 - wardrobeCount} more {5 - wardrobeCount === 1 ? "piece" : "pieces"}
+                </span>
+                {" "}so Perene can style you better — currently styling from {wardrobeCount} {wardrobeCount === 1 ? "item" : "items"}.
+              </p>
+            </div>
+            <Link
+              href="/wardrobe#upload"
+              className="px-5 py-2.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] transition-colors flex-shrink-0 self-start sm:self-auto"
+            >
+              Add to closet →
+            </Link>
+          </div>
+        )}
 
         {/* ── Weather / location setup (full width, above grid) ──────── */}
         {!profileLoading && (
@@ -321,9 +359,12 @@ export default function DashboardPage() {
                   </svg>
                 }
                 title="Outfit Generator"
-                stat="Get your next look"
+                stat={outfitGated ? `${5 - wardrobeCount} more to unlock` : "Get your next look"}
                 cta="Generate outfit →"
                 href="/outfits/new"
+                disabled={outfitGated}
+                disabledLabel={outfitGated ? `Add ${5 - wardrobeCount} more` : "Coming soon"}
+                disabledTitle={outfitGated ? "Add at least 5 items to start generating outfits" : undefined}
               />
               <FeatureTile
                 icon={

@@ -31,6 +31,35 @@ export default function DashboardNav({ user }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
+  // Stats: stamp last_visit once per browser tab. Throttle prevents writes on
+  // every authenticated route mount; closing/reopening the tab counts as a new
+  // visit. Fire-and-forget — never block the nav from rendering.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("perene:lastVisitWritten") === "1") return;
+    sessionStorage.setItem("perene:lastVisitWritten", "1");
+    supabase
+      .from("user_profiles")
+      .update({ last_visit: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .then(() => {}, () => {});
+  }, [user?.id]);
+
+  // Stats: increment login_count on actual SIGNED_IN events. Supabase fires
+  // SIGNED_IN on token refresh too, so we throttle per tab via sessionStorage —
+  // first SIGNED_IN per tab counts, subsequent refreshes don't.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" || !session?.user) return;
+      if (typeof window === "undefined") return;
+      if (sessionStorage.getItem("perene:loginCounted") === "1") return;
+      sessionStorage.setItem("perene:loginCounted", "1");
+      supabase.rpc("increment_login_count").then(() => {}, () => {});
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   // Truncate long emails so the nav doesn't crowd on small screens
   const displayEmail = user?.email
     ? user.email.length > 22

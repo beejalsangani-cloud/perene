@@ -122,6 +122,140 @@ function EmptyState({ onAdd }) {
   );
 }
 
+// ── Closet stats strip ────────────────────────────────────────────────────────
+// Six tiles: tops, bottoms, dresses, shoes, outerwear, accessories. The
+// underlying CATEGORIES list (UploadModal.js) is Title-Case singular and
+// includes "Bag" + "Other" beyond these six — Bag rolls into Accessory for
+// display, Other is counted in totalItems only.
+const STAT_TILES = [
+  {
+    key: "Top",
+    label: "tops",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M9 3 5 5v4h3v12h8V9h3V5l-4-2a3 3 0 0 1-6 0Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: "Bottom",
+    label: "bottoms",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M5 3h14l-1 8-1 10h-4l-1-9-1 9H7L6 11 5 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: "Dress",
+    label: "dresses",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M9 3h6l1 4-2 2 4 12H6l4-12-2-2 1-4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: "Shoes",
+    label: "shoes",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M2 17h5l3-4 3 1 4 1 5 2v2H2v-2Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M10 13l-1-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: "Outerwear",
+    label: "outerwear",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M7 4 4 6v4h3v11h10V10h3V6l-3-2-2 2h-6l-2-2Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M12 10v11" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    ),
+  },
+  {
+    key: "Accessory",
+    label: "accessories",
+    mergeKeys: ["Bag"],
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 sm:w-6 sm:h-6">
+        <path d="M5 9h14l-1 11H6L5 9Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M9 9V7a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+];
+
+function formatLastVisit(iso) {
+  if (iso === undefined) return "…";
+  if (iso === null)      return "First visit";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days < 1)   return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7)   return `${days}d ago`;
+  if (days < 30)  return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function ClosetStats({ totalItems, byCategory, outfitsStyled, lastVisitIso }) {
+  const safeTotal = Math.max(0, Math.round(totalItems ?? 0));
+  return (
+    <div
+      className="mb-8 rounded-2xl border border-[#2A3D2E]/8 bg-white p-5"
+      style={{ fontFamily: "var(--font-inter)" }}
+    >
+      {/* Top row — total / outfits / last visit */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-6 text-sm">
+        <p className="text-[#2A3D2E]/70">
+          <span className="text-[#2A3D2E]/45">Your closet ·</span>{" "}
+          <span className="font-semibold text-[#2A3D2E]">
+            {safeTotal} item{safeTotal === 1 ? "" : "s"}
+          </span>
+        </p>
+        <p className="text-[#2A3D2E]/70">
+          <span className="text-[#2A3D2E]/45">Outfits styled ·</span>{" "}
+          <span className="font-semibold text-[#2A3D2E]">
+            {outfitsStyled === null ? "…" : Math.max(0, Math.round(outfitsStyled))}
+          </span>
+        </p>
+        <p className="text-[#2A3D2E]/70">
+          <span className="text-[#2A3D2E]/45">Last visit ·</span>{" "}
+          <span className="font-semibold text-[#2A3D2E]">{formatLastVisit(lastVisitIso)}</span>
+        </p>
+      </div>
+
+      {/* Bottom row — six category tiles, single 6-col grid at every breakpoint */}
+      <div className="mt-4 pt-4 border-t border-[#2A3D2E]/6 grid grid-cols-6 gap-2 sm:gap-4">
+        {STAT_TILES.map(({ key, label, icon, mergeKeys = [] }) => {
+          const raw = (byCategory[key] ?? 0) + mergeKeys.reduce((s, k) => s + (byCategory[k] ?? 0), 0);
+          const count = Math.max(0, Math.round(raw));
+          return (
+            <div key={key} className="flex flex-col items-center gap-1 sm:gap-1.5 text-center">
+              <div className="text-[#2A3D2E]/65">{icon}</div>
+              <span className="text-base sm:text-xl font-bold text-[#2A3D2E] leading-none">
+                {count}
+              </span>
+              <span className="text-[10px] sm:text-xs text-[#2A3D2E]/50 leading-tight">
+                {label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function countByCategory(items) {
+  const acc = { Top: 0, Bottom: 0, Dress: 0, Shoes: 0, Outerwear: 0, Accessory: 0, Bag: 0 };
+  for (const item of items ?? []) {
+    if (item.category && acc[item.category] !== undefined) acc[item.category]++;
+  }
+  return acc;
+}
+
 // ── Grid skeleton ─────────────────────────────────────────────────────────────
 function GridSkeleton() {
   return (
@@ -142,12 +276,14 @@ function GridSkeleton() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function WardrobePage() {
   const router = useRouter();
-  const [user,      setUser]      = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [items,     setItems]     = useState(null); // null = loading
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editItem,  setEditItem]  = useState(null);
-  const [deleting,  setDeleting]  = useState(null); // id of item being deleted
+  const [user,           setUser]           = useState(null);
+  const [authReady,      setAuthReady]      = useState(false);
+  const [items,          setItems]          = useState(null); // null = loading
+  const [modalOpen,      setModalOpen]      = useState(false);
+  const [editItem,       setEditItem]       = useState(null);
+  const [deleting,       setDeleting]       = useState(null); // id of item being deleted
+  const [outfitsStyled,  setOutfitsStyled]  = useState(null); // null = loading
+  const [lastVisitIso,   setLastVisitIso]   = useState(undefined); // undefined = loading, null = no value yet
 
   // ── Auth gate ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -184,6 +320,27 @@ export default function WardrobePage() {
   useEffect(() => {
     if (authReady && user) loadItems(user.id);
   }, [authReady, user, loadItems]);
+
+  // Stats: outfits styled (count) + last visit (timestamp). Fetched in parallel
+  // alongside items; failures fall back to 0 / null so the strip still renders.
+  useEffect(() => {
+    if (!authReady || !user) return;
+    Promise.all([
+      supabase.from("outfits")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id),
+      supabase.from("user_profiles")
+        .select("last_visit")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]).then(([countRes, profileRes]) => {
+      setOutfitsStyled(countRes.count ?? 0);
+      setLastVisitIso(profileRes.data?.last_visit ?? null);
+    }).catch(() => {
+      setOutfitsStyled(0);
+      setLastVisitIso(null);
+    });
+  }, [authReady, user]);
 
   // Hash-based auto-open: /wardrobe#upload lands the user directly in the
   // upload modal. Used by /welcome and the dashboard soft-gate banner so the
@@ -292,6 +449,16 @@ export default function WardrobePage() {
             </div>
           )}
         </div>
+
+        {/* ── Stats strip (hidden while loading and on empty state) ─────── */}
+        {items !== null && count > 0 && (
+          <ClosetStats
+            totalItems={count}
+            byCategory={countByCategory(items)}
+            outfitsStyled={outfitsStyled}
+            lastVisitIso={lastVisitIso}
+          />
+        )}
 
         {/* ── Grid / empty / skeleton ──────────────────────────────────── */}
         {items === null ? (

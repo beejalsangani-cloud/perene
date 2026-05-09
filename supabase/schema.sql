@@ -56,3 +56,24 @@ create policy "users: update own profile"
 alter table public.user_profiles
   add column if not exists first_name        text,
   add column if not exists marketing_opt_in  boolean default false;
+
+-- ── 2026-05-09: closet-stats engagement tracking ──────────────────────────────
+-- last_visit / last_outfit_at are nullable timestamps written fire-and-forget
+-- from DashboardNav (page mount) and the outfit generation API route. login_count
+-- is incremented atomically via the increment_login_count RPC on Supabase
+-- SIGNED_IN events, throttled to once per browser tab via sessionStorage. All
+-- three are best-effort signals — failures must never block user-facing flows.
+alter table public.user_profiles
+  add column if not exists last_visit       timestamptz,
+  add column if not exists login_count      integer default 0,
+  add column if not exists last_outfit_at   timestamptz;
+
+create or replace function public.increment_login_count()
+returns void language sql security definer set search_path = public as $$
+  update public.user_profiles
+    set login_count = coalesce(login_count, 0) + 1
+    where user_id = auth.uid();
+$$;
+
+revoke all on function public.increment_login_count() from public;
+grant execute on function public.increment_login_count() to authenticated;

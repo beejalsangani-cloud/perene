@@ -297,5 +297,17 @@ Rules:
     return Response.json({ error: dbErr.message, code: dbErr.code }, { status: 500 });
   }
 
+  // Stats: stamp last_outfit_at on the user's profile. Awaited so the write
+  // completes before the serverless invocation ends, but errors are swallowed
+  // so a stats failure never bubbles up to the user.
+  try {
+    await supabaseAdmin
+      .from("user_profiles")
+      .update({ last_outfit_at: new Date().toISOString() })
+      .eq("user_id", userId);
+  } catch (err) {
+    console.error("[outfits/generate] last_outfit_at update error:", err);
+  }
+
   return Response.json({ id: outfit.id });
 }

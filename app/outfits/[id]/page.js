@@ -182,6 +182,9 @@ function MissingItem({ item: { item, category, why, price_range, retailers }, va
                     </svg>
                   </a>
                 ))}
+                <p className="mt-2 text-xs text-[#2A3D2E]/60">
+                  Browse similar items at these retailers — exact matches not guaranteed.
+                </p>
                 <p className="mt-1 text-[10px] italic text-[#2A3D2E]/45">
                   Affiliate links — Perene may earn a commission.
                 </p>

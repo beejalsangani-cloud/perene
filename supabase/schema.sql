@@ -128,3 +128,39 @@ create table if not exists public.outfits (
 );
 
 alter table public.outfits enable row level security;
+
+-- ── 2026-05-11: affiliate URL validation cache ────────────────────────────────
+-- Backs server-side URL validation (lib/affiliate-validator.js, /api/affiliate/
+-- validate). cache_key is sha256(retailer + '|' + url) so identical retailer/
+-- URL pairs collapse to a single row; retailer + search_query stored alongside
+-- for log queries ("which retailer is failing most?"). failure_reason is one
+-- of: status_NNN, content_marker_missing — populated only when is_valid=false.
+-- TTLs are enforced application-side (24h success / 1h failure) so a stale row
+-- triggers a re-probe; the pg_cron job 'affiliate-url-checks-cleanup-7d'
+-- handles physical row pruning at 04:15 UTC daily.
+--
+-- RLS is on with no policies — service-role-only access. The validator uses
+-- supabaseAdmin which bypasses RLS; end users have no business reading this
+-- internal cache.
+create table if not exists public.affiliate_url_checks (
+  cache_key       text primary key,
+  retailer        text not null,
+  search_query    text not null,
+  is_valid        boolean not null,
+  failure_reason  text,
+  checked_at      timestamptz default now()
+);
+
+create index if not exists affiliate_url_checks_checked_at_idx
+  on public.affiliate_url_checks(checked_at);
+
+alter table public.affiliate_url_checks enable row level security;
+
+-- Scheduled cleanup (run manually in Supabase dashboard — pg_cron schedule
+-- declarations are kept out of this file to avoid re-creating the job on
+-- every replay):
+--   select cron.schedule(
+--     'affiliate-url-checks-cleanup-7d',
+--     '15 4 * * *',
+--     $$ delete from public.affiliate_url_checks where checked_at < now() - interval '7 days' $$
+--   );

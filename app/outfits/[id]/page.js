@@ -123,12 +123,16 @@ function ItemCard({ item, role, stylingNote }) {
 }
 
 // ── Missing item row ──────────────────────────────────────────────────────────
-function MissingItem({ item: { item, category, why, price_range, retailers } }) {
+// validUrlSet === null means validation hasn't returned yet — show every link
+// (option (a): fail-open / no perceived delay). Once validation resolves the
+// set, we filter to only verified URLs; dead retailers silently disappear.
+function MissingItem({ item: { item, category, why, price_range, retailers }, validUrlSet }) {
   const [expanded, setExpanded] = useState(false);
 
   const shopLinks = (retailers ?? [])
     .map((r) => ({ name: r.name, url: buildShopUrl({ retailer: r.name, query: r.search_query }) }))
-    .filter((r) => r.url);
+    .filter((r) => r.url)
+    .filter((r) => validUrlSet === null || validUrlSet.has(r.url));
 
   return (
     <div className="flex items-start gap-4 py-4 border-b border-[#2A3D2E]/6 last:border-0"
@@ -195,12 +199,15 @@ export default function OutfitResultPage({ params }) {
   const { id }  = use(params);
   const router  = useRouter();
 
-  const [user,      setUser]      = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [outfit,    setOutfit]    = useState(null);
-  const [items,     setItems]     = useState({});
-  const [loading,   setLoading]   = useState(true);
-  const [notFound,  setNotFound]  = useState(false);
+  const [user,          setUser]          = useState(null);
+  const [authReady,     setAuthReady]     = useState(false);
+  const [outfit,        setOutfit]        = useState(null);
+  const [items,         setItems]         = useState({});
+  const [loading,       setLoading]       = useState(true);
+  const [notFound,      setNotFound]      = useState(false);
+  // null = validation in flight (show all retailer links). Set of valid URLs
+  // once /api/affiliate/validate responds; filtered Set on fail-open errors.
+  const [validUrlSet,   setValidUrlSet]   = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -235,6 +242,57 @@ export default function OutfitResultPage({ params }) {
     }
     load();
   }, [authReady, user, id]);
+
+  // Validate all retailer URLs in one round trip. Fails open everywhere — any
+  // error path leaves validUrlSet null OR a permissive Set, so the user always
+  // sees something rather than a stripped-down list.
+  useEffect(() => {
+    if (!outfit) return;
+    const allLinks = [];
+    const seen = new Set();
+    for (const m of outfit.missing_items ?? []) {
+      for (const r of m.retailers ?? []) {
+        const url = buildShopUrl({ retailer: r.name, query: r.search_query });
+        if (url && !seen.has(url)) {
+          seen.add(url);
+          allLinks.push({ url, retailer: r.name });
+        }
+      }
+    }
+    if (allLinks.length === 0) {
+      setValidUrlSet(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const allUrls = new Set(allLinks.map((l) => l.url));
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) {
+          if (!cancelled) setValidUrlSet(allUrls); // fail open: show everything
+          return;
+        }
+        const res = await fetch("/api/affiliate/validate", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type":  "application/json",
+          },
+          body: JSON.stringify({ items: allLinks }),
+        });
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const { results } = await res.json();
+        if (cancelled) return;
+        setValidUrlSet(new Set(results.filter((r) => r.valid).map((r) => r.url)));
+      } catch (err) {
+        console.error("[outfit] retailer validation error:", err);
+        if (!cancelled) setValidUrlSet(allUrls); // fail open
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [outfit]);
 
   if (!authReady || loading) {
     return (
@@ -341,7 +399,7 @@ export default function OutfitResultPage({ params }) {
                 </h3>
                 <p className="text-xs text-[#2A3D2E]/45 mb-4">Pieces that would elevate this look.</p>
                 <div>
-                  {missingItems.map((m, i) => <MissingItem key={i} item={m}/>)}
+                  {missingItems.map((m, i) => <MissingItem key={i} item={m} validUrlSet={validUrlSet}/>)}
                 </div>
               </div>
             )}

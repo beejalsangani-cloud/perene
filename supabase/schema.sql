@@ -77,3 +77,54 @@ $$;
 
 revoke all on function public.increment_login_count() from public;
 grant execute on function public.increment_login_count() to authenticated;
+
+-- ── 2026-05-09: documenting wardrobe_items and outfits tables ─────────────────
+-- These tables already exist in production. Their definitions below are
+-- reconstructed from the application code that reads / writes them
+-- (UploadModal.js, wardrobe/page.js, api/outfits/generate/route.js,
+-- outfits/[id]/page.js). Wrapped in `if not exists` so re-running this file
+-- against the live schema is a safe no-op. Treat the live Supabase definition
+-- as canonical if there's any drift.
+
+-- Wardrobe items: one row per uploaded clothing item. image_url stores the
+-- storage path inside the "wardrobe" bucket, not a public URL — clients fetch
+-- a signed URL at read time. category is one of the values in CATEGORIES
+-- (UploadModal.js:7); season is a multi-select array.
+create table if not exists public.wardrobe_items (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  image_url   text not null,
+  category    text,
+  color       text,
+  season      text[] default '{}',
+  notes       text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create or replace trigger wardrobe_items_updated_at
+  before update on public.wardrobe_items
+  for each row execute procedure public.set_updated_at();
+
+alter table public.wardrobe_items enable row level security;
+
+-- Outfits: one row per AI-generated outfit. event_description is the user's
+-- free-form prompt; date / location are optional occasion metadata; weather
+-- captures the snapshot used at generation time. generated_outfit holds the
+-- full Claude response (selected_items[], styling_reasoning, overall_vibe,
+-- confidence_level, human_review_recommended). missing_items + confidence
+-- are denormalized for index-page rendering.
+create table if not exists public.outfits (
+  id                 uuid primary key default gen_random_uuid(),
+  user_id            uuid references auth.users(id) on delete cascade not null,
+  event_description  text not null,
+  location           text,
+  date               text,
+  weather            jsonb,
+  generated_outfit   jsonb,
+  missing_items      jsonb default '[]'::jsonb,
+  confidence         text,
+  created_at         timestamptz default now()
+);
+
+alter table public.outfits enable row level security;

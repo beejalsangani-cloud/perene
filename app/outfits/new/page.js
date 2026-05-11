@@ -44,6 +44,9 @@ function NewOutfitContent() {
   const [eventDescription, setEventDescription] = useState(searchParams.get("occasion") ?? "");
   const [location,         setLocation]         = useState("");
   const [date,             setDate]             = useState(searchParams.get("date") ?? "");
+  // Photo URL forwarded from the Discover modal (InspirationFeed). Validated
+  // and host-allowlisted server-side; we just pass it through here.
+  const inspirationImageUrl = searchParams.get("inspiration") ?? "";
 
   const [generating,       setGenerating]       = useState(false);
   const [error,            setError]            = useState("");
@@ -93,8 +96,9 @@ function NewOutfitContent() {
         body: JSON.stringify({
           userId: user.id,
           eventDescription,
-          location: location || undefined,
-          date:     date     || undefined,
+          location:            location             || undefined,
+          date:                date                 || undefined,
+          inspirationImageUrl: inspirationImageUrl  || undefined,
         }),
       });
       const data = await res.json();

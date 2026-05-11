@@ -109,6 +109,26 @@ function sanitizeMissingItems(raw) {
   }));
 }
 
+// ── Inspiration-image URL validation ──────────────────────────────────────────
+// The inspiration URL is passed straight to Anthropic, which then fetches it
+// from our account. Allowlisting the host prevents this endpoint from being
+// turned into a generic "make Claude fetch any URL" proxy. Only Unsplash CDN
+// hosts are accepted; anything else is silently dropped and we fall back to
+// text-only generation.
+const INSPIRATION_HOST_ALLOWLIST = ["images.unsplash.com", "plus.unsplash.com"];
+
+function sanitizeInspirationUrl(url) {
+  if (typeof url !== "string" || !url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return null;
+    if (!INSPIRATION_HOST_ALLOWLIST.includes(u.hostname.toLowerCase())) return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
 function formatDateForPrompt(dateStr) {
   // "2025-05-15" → "May 15, 2025"
   try {
@@ -123,11 +143,14 @@ function formatDateForPrompt(dateStr) {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request) {
-  const { userId, eventDescription, location, date } = await request.json();
+  const { userId, eventDescription, location, date, inspirationImageUrl } = await request.json();
 
   if (!userId || !eventDescription?.trim()) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
+
+  // Validated server-side; null means "no image" (either missing or rejected).
+  const inspirationUrl = sanitizeInspirationUrl(inspirationImageUrl);
 
   // Fetch wardrobe + profile + weather in parallel
   const [wardrobeRes, profileRes, weather] = await Promise.all([
@@ -169,6 +192,20 @@ export async function POST(request) {
       )
     : ["(Wardrobe is empty — no items to select from.)"];
 
+  // Inspiration block — only present when an Unsplash URL was passed AND
+  // host-allowlist accepted it. Tells Claude to drive the look from the image
+  // and constrain missing_items to pieces actually visible there.
+  const inspirationBlock = inspirationUrl
+    ? `\nINSPIRATION IMAGE:
+An image is attached. Treat it as the user's visual reference for the look they want.
+- Identify each visible garment in the image: top, bottom or dress, footwear, outerwear, accessories. Note color, silhouette, and material.
+- Build the outfit by matching each visible garment to the CLOSEST wardrobe item by category and color. If two wardrobe items could fit a role, pick the one whose color most closely matches the image.
+- For any piece clearly visible in the image that has no reasonable wardrobe match, list THAT specific piece in missing_items (e.g. "rust silk blouse", "cream wide-leg trouser") — not generic wardrobe gaps.
+- Do NOT invent missing_items for pieces not visible in the image. If the image shows no jewelry, do not suggest jewelry.
+- overall_vibe should describe the image's look, not the wardrobe.
+- When an inspiration image is present, this overrides the generic "missing_items would complete or elevate the look" rule below — missing_items strictly mirrors what's in the image that the wardrobe lacks.\n`
+    : "";
+
   // Weather block only injected when we have real data
   const weatherBlock = weather
     ? `\nWEATHER FOR ${weather.location.toUpperCase()} ON ${formatDateForPrompt(date)}:
@@ -189,7 +226,7 @@ Factor this weather into your outfit selection:
   const userPrompt = `Build an outfit for this occasion: "${eventDescription.trim()}"${
     location ? `\nLocation: ${location}` : ""
   }${date ? `\nDate: ${formatDateForPrompt(date)}` : ""}
-${weatherBlock}
+${weatherBlock}${inspirationBlock}
 STYLE PROFILE:
 ${profileLines.join("\n")}
 
@@ -244,17 +281,46 @@ Rules:
   // ── Call Claude ───────────────────────────────────────────────────────────
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  // When an inspiration URL is present, content is a multimodal content-block
+  // array (image then text). When absent, it stays a plain string so the
+  // existing text-only path is byte-identical.
+  const userMessageContent = inspirationUrl
+    ? [
+        { type: "image", source: { type: "url", url: inspirationUrl } },
+        { type: "text",  text: userPrompt },
+      ]
+    : userPrompt;
+
   let message;
   try {
     message = await client.messages.create({
       model: "claude-opus-4-6",
       max_tokens: 1500,
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{ role: "user", content: userMessageContent }],
     });
   } catch (err) {
-    console.error("[outfits/generate] Claude API error:", err);
-    return Response.json({ error: "AI generation failed", details: err.message }, { status: 500 });
+    // Image attachment can fail for reasons unrelated to the rest of the
+    // prompt: Anthropic couldn't fetch the URL, the image format is rejected,
+    // size limits, etc. One retry without the image so the user still gets
+    // an outfit instead of an error toast.
+    if (inspirationUrl) {
+      console.error("[outfits/generate] image attach failed, retrying text-only:", err.message);
+      try {
+        message = await client.messages.create({
+          model: "claude-opus-4-6",
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+      } catch (err2) {
+        console.error("[outfits/generate] Claude API error (text-only retry also failed):", err2);
+        return Response.json({ error: "AI generation failed", details: err2.message }, { status: 500 });
+      }
+    } else {
+      console.error("[outfits/generate] Claude API error:", err);
+      return Response.json({ error: "AI generation failed", details: err.message }, { status: 500 });
+    }
   }
 
   // ── Parse response ────────────────────────────────────────────────────────

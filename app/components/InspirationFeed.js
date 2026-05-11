@@ -61,7 +61,9 @@ function PhotoModal({ photo, onClose }) {
             )}
           </div>
           <Link
-            href={`/outfits/new?occasion=${encodeURIComponent(occasion)}`}
+            href={`/outfits/new?occasion=${encodeURIComponent(occasion)}${
+              photo.url ? `&inspiration=${encodeURIComponent(photo.url)}` : ""
+            }`}
             className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] transition-colors"
           >
             Get this look ✦

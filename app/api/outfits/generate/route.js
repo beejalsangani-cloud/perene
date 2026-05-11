@@ -226,18 +226,16 @@ Rules:
 - If wardrobe is empty, selected_items must be []
 - List 1–3 missing_items that would complete or elevate the look
 - Each missing_item must include 2–3 retailers from the roster, ordered best match first
-- Retailer "name" must be spelled exactly as in the roster (e.g. "Saks Fifth Avenue", "Sézane", "Net-a-Porter")
+- Retailer "name" must be spelled exactly as in the roster (e.g. "Saks Fifth Avenue", "Net-a-Porter", "Free People")
 - "search_query" is 2–6 plain keywords (no brand names, no quotes, no punctuation)
 - Match retailer to item type — each retailer is narrow, respect the fit:
-  - Mejuri: jewelry only; never clothing, shoes, or bags
-  - Reformation: dresses, romantic tops, occasion pieces; never blazers, suits, workwear, or heavy outerwear
+  - Reformation: dresses, romantic tops, occasion pieces, Parisian-style polished casual, knits, blouses; never blazers, suits, workwear, or heavy outerwear
   - Free People: boho, festival, casual layers; never formal/black-tie or polished workwear
   - Anthropologie: bohemian-eclectic, romantic, occasion-friendly; avoid streetwear or athletic pieces
-  - Net-a-Porter and Saks Fifth Avenue: luxury/designer investment pieces only ($300+); never for items the user wants under $200
-  - Aritzia: elevated minimalist contemporary basics, workwear, knits; avoid boho, festival, or super-formal occasion wear
-  - Sézane: French-girl polished casual, knits, blouses; avoid athletic, streetwear, or boho
+  - Net-a-Porter and Saks Fifth Avenue: luxury/designer investment pieces ($300+), elevated knits and blouses, and fine jewelry; never for items the user wants under $200
+  - Aritzia: elevated minimalist contemporary basics, workwear, knits, polished casual, blouses; avoid boho, festival, or super-formal occasion wear
   - Revolve: contemporary trend-forward going-out clothes, dresses, statement pieces; avoid minimalist basics or workwear
-  - Nordstrom: broad department-store fallback; strong for shoes, denim, mainstream brands; use as default when nothing else fits
+  - Nordstrom: broad department-store fallback; strong for shoes, denim, fine jewelry, mainstream brands; use as default when nothing else fits
   - ASOS: trendy, younger price points, fast-fashion-adjacent; use for trend pieces under $150
 - If no retailer confidently fits an item, prefer 1–2 strong matches over forcing a third weak one — 2 confident retailers beat 3 with one that won't carry the item
 - confidence_level is "high" when every key role is filled, "medium" when 1–2 are missing, "low" when wardrobe is very sparse

@@ -180,6 +180,7 @@ export async function POST(request) {
         profile.age_range                 && `Age range: ${profile.age_range}`,
         profile.body_type                 && `Body type: ${profile.body_type}`,
         profile.style_descriptors?.length && `Style keywords: ${profile.style_descriptors.join(", ")}`,
+        profile.lifestyle?.length         && `Lifestyle: ${profile.lifestyle.join(", ")}`,
         profile.typical_events?.length    && `Typical occasions: ${profile.typical_events.join(", ")}`,
         profile.color_preferences?.length && `Colour preferences: ${profile.color_preferences.join(", ")}`,
         profile.budget_range              && `Budget per item: ${profile.budget_range}`,

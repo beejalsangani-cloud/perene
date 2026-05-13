@@ -9,6 +9,8 @@ import WeatherWidget from "@/app/components/WeatherWidget";
 import LocationSetup from "@/app/components/LocationSetup";
 import InspirationFeed from "@/app/components/InspirationFeed";
 import StyleTips from "@/app/components/StyleTips";
+import TodaysOutfits from "@/app/components/TodaysOutfits";
+import WearPrompt from "@/app/components/WearPrompt";
 // 2026-05-04: WeeklyCalendar card hidden on dashboard. Component file + weather APIs remain; re-enable by uncommenting this import and the JSX block below.
 // import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
@@ -317,6 +319,12 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+
+        {/* ── "Did you wear yesterday's look?" prompt ────────────────── */}
+        {user && <WearPrompt user={user}/>}
+
+        {/* ── Today's outfits (Daytime + Evening) ────────────────────── */}
+        {user && <TodaysOutfits user={user}/>}
 
         {/* ── Two-column layout ───────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

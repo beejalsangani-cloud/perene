@@ -186,3 +186,59 @@ create table if not exists public.discover_descriptions (
 );
 
 alter table public.discover_descriptions enable row level security;
+
+-- ── 2026-05-12: Today's Outfits + "Did you wear this" prompt ─────────────────
+-- Two coupled tables for the daily-outfit feature:
+--
+-- daily_outfits is a pointer table — for each (user, date, slot) it points at
+-- the current outfit. On shuffle, the outfit_id is replaced and shuffle_count
+-- increments. The shuffle ceiling is enforced application-side (free tier = 3
+-- per slot per day) so we can lift it per user tier without a DB change. The
+-- unique constraint guarantees exactly one daytime + one evening row per day.
+create table if not exists public.daily_outfits (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid references auth.users(id) on delete cascade not null,
+  outfit_id           uuid references public.outfits(id) on delete cascade not null,
+  generated_for_date  date not null,
+  slot                text not null check (slot in ('daytime', 'evening')),
+  shuffle_count       integer default 0,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now(),
+  unique (user_id, generated_for_date, slot)
+);
+
+create index if not exists daily_outfits_user_date_idx
+  on public.daily_outfits(user_id, generated_for_date);
+
+create or replace trigger daily_outfits_updated_at
+  before update on public.daily_outfits
+  for each row execute procedure public.set_updated_at();
+
+alter table public.daily_outfits enable row level security;
+
+-- outfit_wear_log captures "did you wear it" responses. One row per (user,
+-- outfit). Created lazily when the user is first shown the morning prompt;
+-- worn stays NULL after 48h with no response (the prompt query filters to
+-- the 48h window, so older outfits never resurface). The CHECK ensures
+-- not_worn_reason is only populated when worn=false; the brief transient
+-- (worn=false, reason=null) state is allowed so the UI doesn't have to
+-- write both fields in one transaction.
+create table if not exists public.outfit_wear_log (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid references auth.users(id) on delete cascade not null,
+  outfit_id           uuid references public.outfits(id) on delete cascade not null,
+  outfit_date         date not null,
+  outfit_source       text not null check (outfit_source in ('today_daytime', 'today_evening', 'manual')),
+  worn                boolean,
+  not_worn_reason     text check (not_worn_reason in ('wrong_vibe', 'weather_changed', 'didnt_feel_like_it', 'other')),
+  prompted_at         timestamptz,
+  responded_at        timestamptz,
+  created_at          timestamptz default now(),
+  unique (user_id, outfit_id),
+  check (not_worn_reason is null or worn = false)
+);
+
+create index if not exists outfit_wear_log_user_date_idx
+  on public.outfit_wear_log(user_id, outfit_date);
+
+alter table public.outfit_wear_log enable row level security;

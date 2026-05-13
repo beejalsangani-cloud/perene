@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 // ── Profile → Unsplash query helpers ─────────────────────────────────────────
 // Discover personalizes search by mapping quiz answers to keywords:
@@ -49,14 +50,54 @@ function shuffleInPlace(arr) {
 }
 
 // ── Image modal ───────────────────────────────────────────────────────────────
+// The "Get this look" button doesn't navigate directly anymore. Unsplash's
+// alt_description describes the photo subject (often the person, not the
+// outfit), which used to land in the occasion field and confuse outfit
+// generation. We now POST to /api/describe-look first to get a Claude-written
+// "[vibe] — [outfit]" description, then navigate to /outfits/new with that
+// as the occasion. Falls back to a generic string if the API is unavailable
+// so the user still gets to the generator.
 function PhotoModal({ photo, onClose }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const occasion = photo.alt || "this look";
+  async function handleGetThisLook() {
+    if (loading) return;
+    setLoading(true);
+
+    let description = "everyday outfit inspiration";
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (token && photo.id && photo.url) {
+        const res = await fetch("/api/describe-look", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type":  "application/json",
+          },
+          body: JSON.stringify({ photoId: photo.id, imageUrl: photo.url }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.description) description = data.description;
+        }
+      }
+    } catch (err) {
+      console.error("[PhotoModal] describe-look failed:", err);
+      // description stays at fallback
+    }
+
+    const params = new URLSearchParams({ occasion: description });
+    if (photo.url) params.set("inspiration", photo.url);
+    router.push(`/outfits/new?${params.toString()}`);
+  }
 
   return (
     <div
@@ -96,14 +137,14 @@ function PhotoModal({ photo, onClose }) {
               <p className="text-sm font-medium text-[#2A3D2E] leading-snug capitalize">{photo.alt}</p>
             )}
           </div>
-          <Link
-            href={`/outfits/new?occasion=${encodeURIComponent(occasion)}${
-              photo.url ? `&inspiration=${encodeURIComponent(photo.url)}` : ""
-            }`}
-            className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] transition-colors"
+          <button
+            type="button"
+            onClick={handleGetThisLook}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
           >
-            Get this look ✦
-          </Link>
+            {loading ? "Reading the look…" : "Get this look ✦"}
+          </button>
         </div>
       </div>
     </div>

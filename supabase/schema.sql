@@ -164,3 +164,25 @@ alter table public.affiliate_url_checks enable row level security;
 --     '15 4 * * *',
 --     $$ delete from public.affiliate_url_checks where checked_at < now() - interval '7 days' $$
 --   );
+
+-- ── 2026-05-12: discover photo description cache ──────────────────────────────
+-- Backs /api/describe-look. When a user clicks "Get this look" on a Discover
+-- inspiration photo, the route calls Claude Haiku with the image and stores
+-- the resulting "[occasion vibe] — [outfit description]" string here, keyed
+-- by Unsplash photo_id. Used to replace the broken Unsplash alt_description
+-- (which describes the photo subject, not the outfit) on the outfit-generator
+-- occasion pre-fill.
+--
+-- No TTL — Unsplash photo IDs are immutable and the look in a photo doesn't
+-- change, so a row is valid forever. To force re-generation after a prompt
+-- change, run `truncate public.discover_descriptions;` once.
+--
+-- RLS is on with no policies — service-role-only access. The route uses
+-- supabaseAdmin which bypasses RLS.
+create table if not exists public.discover_descriptions (
+  photo_id     text primary key,
+  description  text not null,
+  created_at   timestamptz default now()
+);
+
+alter table public.discover_descriptions enable row level security;

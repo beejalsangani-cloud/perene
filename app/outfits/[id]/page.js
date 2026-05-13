@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 import WeatherIcon from "@/app/components/WeatherIcon";
 import { buildShopUrl, OUTBOUND_LINK_REL } from "@/lib/affiliate";
+import SaveButton from "@/app/components/SaveButton";
 
 // ── Weather card (prominent, full-width) ──────────────────────────────────────
 
@@ -414,6 +415,7 @@ export default function OutfitResultPage({ params }) {
           <Link href="/outfits/new" className="px-6 py-3 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-sm hover:bg-[#d4f562] active:scale-[0.98] transition-all">
             Generate another outfit ✦
           </Link>
+          <SaveButton outfitId={outfit.id} initialSaved={!!outfit.is_saved} variant="button"/>
           <Link href="/wardrobe" className="px-6 py-3 rounded-full border border-[#2A3D2E]/15 text-[#2A3D2E]/65 font-semibold text-sm hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] transition-all">
             Back to closet
           </Link>

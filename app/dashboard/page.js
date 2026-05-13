@@ -11,6 +11,7 @@ import InspirationFeed from "@/app/components/InspirationFeed";
 import StyleTips from "@/app/components/StyleTips";
 import TodaysOutfits from "@/app/components/TodaysOutfits";
 import WearPrompt from "@/app/components/WearPrompt";
+import SavedLooksCard from "@/app/components/SavedLooksCard";
 // 2026-05-04: WeeklyCalendar card hidden on dashboard. Component file + weather APIs remain; re-enable by uncommenting this import and the JSX block below.
 // import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
@@ -202,6 +203,7 @@ export default function DashboardPage() {
   const [user,            setUser]            = useState(null);
   const [profile,         setProfile]         = useState(undefined); // undefined = loading
   const [wardrobeCount,   setWardrobeCount]   = useState(null);
+  const [savedCount,      setSavedCount]      = useState(null);      // for the Saved Looks feature tile
   const [authReady,       setAuthReady]       = useState(false);
   // Managed separately so LocationSetup can update it without a full profile re-fetch
   const [defaultLocation, setDefaultLocation] = useState(undefined); // undefined = not yet known
@@ -222,7 +224,8 @@ export default function DashboardPage() {
     Promise.all([
       supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
       supabase.from("wardrobe_items").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-    ]).then(([profileRes, countRes]) => {
+      supabase.from("outfits").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_saved", true),
+    ]).then(([profileRes, countRes, savedRes]) => {
       if (profileRes.error) console.error("[dashboard] profile fetch error:", profileRes.error);
       const count = countRes.count ?? 0;
 
@@ -238,6 +241,7 @@ export default function DashboardPage() {
       setProfile(p);
       setDefaultLocation(p?.default_location ?? null); // null = no location set yet
       setWardrobeCount(count);
+      setSavedCount(savedRes.count ?? 0);
     });
   }, [authReady, user]);
 
@@ -377,14 +381,13 @@ export default function DashboardPage() {
               <FeatureTile
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
                   </svg>
                 }
                 title="Saved Looks"
-                stat="0 saved"
-                cta=""
-                href=""
-                disabled={true}
+                stat={savedCount === null ? "Loading…" : savedCount === 0 ? "0 saved" : `${savedCount} saved`}
+                cta="View all →"
+                href="/saved"
               />
             </div>
 
@@ -408,26 +411,10 @@ export default function DashboardPage() {
               <WeeklyCalendar defaultLocation={defaultLocation}/>
             )} */}
 
-            {/* Tips + (future) saved looks — 2-col on large screens */}
+            {/* Tips + Saved looks — 2-col on large screens */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <StyleTips userId={user.id}/>
-
-              {/* Placeholder right column — keeps the grid balanced */}
-              <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-6 flex flex-col items-center justify-center gap-4 min-h-[200px]"
-                style={{ fontFamily: "var(--font-inter)" }}>
-                <div className="w-12 h-12 rounded-xl bg-[#F5F1E8] flex items-center justify-center text-[#2A3D2E]">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#2A3D2E]" style={{ fontFamily: "var(--font-playfair)" }}>Saved Looks</p>
-                  <p className="text-xs text-[#2A3D2E]/45 mt-1">Your favourite outfits will live here.</p>
-                </div>
-                <span className="inline-flex items-center px-4 py-2 rounded-full bg-[#2A3D2E]/6 text-[#2A3D2E]/35 text-xs font-semibold">
-                  Coming soon
-                </span>
-              </div>
+              <SavedLooksCard userId={user.id}/>
             </div>
 
             {/* Inspiration Feed — full width */}

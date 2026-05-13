@@ -1,25 +1,24 @@
 "use client";
 
+// Compact horizontal weather strip — quiet status row, not a hero block.
+// ~64px tall on mobile, ~80px on desktop. Single line that prioritizes
+// temp + condition + city + CTA; high/low collapse out on narrow screens.
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import WeatherIcon from "./WeatherIcon";
 
-// Skeleton shimmer
 function WeatherSkeleton() {
   return (
-    <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-7 animate-pulse" style={{ fontFamily: "var(--font-inter)" }}>
-      <div className="h-3 w-36 bg-[#2A3D2E]/8 rounded-full mb-5"/>
-      <div className="flex items-end gap-4 mb-4">
-        <div className="w-14 h-14 bg-[#2A3D2E]/6 rounded-2xl"/>
-        <div>
-          <div className="h-10 w-20 bg-[#2A3D2E]/8 rounded-xl mb-1.5"/>
-          <div className="h-3 w-28 bg-[#2A3D2E]/6 rounded-full"/>
-        </div>
-      </div>
-      <div className="flex gap-4">
-        <div className="h-3 w-16 bg-[#2A3D2E]/6 rounded-full"/>
-        <div className="h-3 w-14 bg-[#2A3D2E]/6 rounded-full"/>
-        <div className="h-3 w-12 bg-[#2A3D2E]/6 rounded-full"/>
+    <div
+      className="rounded-2xl border border-[#2A3D2E]/8 bg-white px-4 sm:px-5 py-3 sm:py-4 animate-pulse"
+      style={{ fontFamily: "var(--font-inter)" }}
+    >
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#2A3D2E]/6 flex-shrink-0"/>
+        <div className="h-6 w-14 rounded bg-[#2A3D2E]/8"/>
+        <div className="h-3 w-24 rounded-full bg-[#2A3D2E]/5"/>
+        <div className="ml-auto h-8 w-24 rounded-full bg-[#C4E552]/30"/>
       </div>
     </div>
   );
@@ -29,7 +28,6 @@ export default function WeatherWidget({ defaultLocation }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Today's date for the CTA link
   const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
@@ -53,49 +51,43 @@ export default function WeatherWidget({ defaultLocation }) {
 
   return (
     <div
-      className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-7"
+      className="rounded-2xl border border-[#2A3D2E]/8 bg-white px-4 sm:px-5 py-3 sm:py-4"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      {/* Label */}
-      <p className="text-xs font-semibold text-[#2A3D2E]/45 uppercase tracking-widest mb-5">
-        Today&apos;s forecast for your wardrobe
-      </p>
-
-      {/* Main row: icon + temp + condition */}
-      <div className="flex items-center gap-5 mb-5">
-        <div className="w-14 h-14 rounded-2xl bg-[#F5F1E8] flex items-center justify-center text-[#2A3D2E] flex-shrink-0">
-          <WeatherIcon code={weather.weather_code} className="w-8 h-8"/>
+      <div className="flex items-center gap-3 sm:gap-4">
+        {/* Icon */}
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F5F1E8] flex items-center justify-center text-[#2A3D2E] flex-shrink-0">
+          <WeatherIcon code={weather.weather_code} className="w-5 h-5 sm:w-6 sm:h-6"/>
         </div>
-        <div>
-          <p className="text-4xl font-bold text-[#2A3D2E] leading-none" style={{ fontFamily: "var(--font-playfair)" }}>
+
+        {/* Temp + condition (always shown) */}
+        <div className="flex items-baseline gap-2 flex-shrink-0">
+          <p className="text-xl sm:text-2xl font-bold text-[#2A3D2E] leading-none"
+             style={{ fontFamily: "var(--font-playfair)" }}>
             {displayTemp}°
           </p>
-          <p className="text-sm text-[#2A3D2E]/55 mt-1">{weather.condition}</p>
+          <p className="text-xs sm:text-sm text-[#2A3D2E]/55 truncate max-w-[110px] sm:max-w-none">
+            {weather.condition}
+          </p>
         </div>
-      </div>
 
-      {/* Detail row */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#2A3D2E]/50 mb-5">
-        <span>H: {weather.temperature_high}°F</span>
-        <span className="text-[#2A3D2E]/20">·</span>
-        <span>L: {weather.temperature_low}°F</span>
-        {weather.precipitation_chance > 0 && (
-          <>
-            <span className="text-[#2A3D2E]/20">·</span>
-            <span>{weather.precipitation_chance}% rain</span>
-          </>
-        )}
-        <span className="text-[#2A3D2E]/20">·</span>
-        <span className="font-medium text-[#2A3D2E]/60">{weather.city}</span>
-      </div>
+        {/* Metadata (high/low hidden on mobile, city always shown) */}
+        <div className="flex-1 min-w-0 flex items-center gap-x-2 sm:gap-x-3 text-[10px] sm:text-xs text-[#2A3D2E]/50 overflow-hidden">
+          <span className="hidden sm:inline">H {weather.temperature_high}°</span>
+          <span className="hidden sm:inline text-[#2A3D2E]/20">·</span>
+          <span className="hidden sm:inline">L {weather.temperature_low}°</span>
+          <span className="hidden sm:inline text-[#2A3D2E]/20">·</span>
+          <span className="font-medium text-[#2A3D2E]/60 truncate">{weather.city}</span>
+        </div>
 
-      {/* CTA */}
-      <Link
-        href={`/outfits/new?date=${today}`}
-        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#C4E552] text-[#2A3D2E] text-xs font-bold hover:bg-[#d4f562] transition-colors"
-      >
-        Style today ✦
-      </Link>
+        {/* CTA */}
+        <Link
+          href={`/outfits/new?date=${today}`}
+          className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#C4E552] text-[#2A3D2E] text-[11px] sm:text-xs font-bold hover:bg-[#d4f562] transition-colors flex-shrink-0"
+        >
+          Style today ✦
+        </Link>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import SaveButton from "@/app/components/SaveButton";
 
 const SHUFFLE_LIMIT_FALLBACK = 3;
 
@@ -144,7 +145,16 @@ function SlotCard({ label, slot, payload, onShuffle, shuffling, signedItemUrls }
       className="rounded-2xl border border-[#2A3D2E]/8 bg-white overflow-hidden flex flex-col"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      <Collage urls={collageUrls}/>
+      <div className="relative">
+        <Collage urls={collageUrls}/>
+        <div className="absolute top-2.5 right-2.5">
+          <SaveButton
+            outfitId={payload.outfit_id}
+            initialSaved={!!outfit?.is_saved}
+            variant="icon"
+          />
+        </div>
+      </div>
       <div className="p-5 flex flex-col gap-3 flex-1">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest">{label}</p>
@@ -206,7 +216,7 @@ function EmptyClosetCard({ count, minimum }) {
       className="rounded-2xl border-2 border-dashed border-[#C9A87C]/40 bg-white p-8 flex flex-col items-start gap-4"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest">Today&apos;s outfits</p>
+      <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest">Today&apos;s suggestions</p>
       <h3 className="text-xl font-bold text-[#2A3D2E] leading-snug" style={{ fontFamily: "var(--font-playfair)" }}>
         Upload {minimum - count} more {minimum - count === 1 ? "piece" : "pieces"} to unlock your daily outfits.
       </h3>
@@ -312,7 +322,7 @@ export default function TodaysOutfits({ user }) {
     return (
       <section className="mb-8" style={{ fontFamily: "var(--font-inter)" }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-[#2A3D2E]/45 uppercase tracking-widest">Today&apos;s outfits</h2>
+          <h2 className="text-xs font-semibold text-[#2A3D2E]/45 uppercase tracking-widest">Today&apos;s suggestions</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SlotSkeleton label="Daytime"/>
@@ -334,7 +344,7 @@ export default function TodaysOutfits({ user }) {
   return (
     <section className="mb-8" style={{ fontFamily: "var(--font-inter)" }}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-semibold text-[#2A3D2E]/45 uppercase tracking-widest">Today&apos;s outfits</h2>
+        <h2 className="text-xs font-semibold text-[#2A3D2E]/45 uppercase tracking-widest">Today&apos;s suggestions</h2>
       </div>
       {error && (
         <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-[#2A3D2E]/12">

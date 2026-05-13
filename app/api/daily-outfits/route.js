@@ -43,22 +43,42 @@ function dayName(dateStr) {
 }
 
 // Per-slot occasion description. Day name lands in the occasion text so the
-// AI factors it in (e.g., Sunday brunch vs. Tuesday office). The "casual"
-// framing keeps daily outfits from feeling like event styling.
+// AI factors it in. The two descriptions are deliberately contrasted —
+// daytime is flat/practical, evening is elevated/intentional — so the AI
+// builds visually distinct outfits per slot rather than two similar looks.
 function eventDescriptionForSlot(slot, dateStr) {
   const day = dayName(dateStr);
   if (slot === "daytime") {
-    return `Daytime outfit for everyday wear on ${day} — office, errands, or casual daytime activities. Keep it practical and wearable rather than dressed-up.`;
+    return `Daytime outfit for ${day}. Practical, comfortable, polished for daily activities — work, errands, casual social. Flat or low-heel footwear, layerable pieces, not statement-heavy. Should feel effortless and easy to move through the day in.`;
   }
-  return `Evening outfit for casual dinner, drinks, or relaxed social outing on ${day} evening. Slightly elevated from daytime but not formal.`;
+  return `Evening outfit for ${day} night. Dressed up for dinner, drinks, or going out tonight. Heels or elevated footwear, a statement piece or sleeker silhouette, deeper or richer palette, more drama and intention than daytime. Should feel like the user wants to be seen.`;
+}
+
+// Pick which aesthetic tag to emphasize on this generation attempt. attemptIndex
+// is 0-indexed: 0 = initial generation, 1 = first shuffle, 2 = second shuffle, …
+// Cycles through the user's style_descriptors so each shuffle leans on a
+// different facet of their style.
+function aestheticEmphasisFor(profile, attemptIndex) {
+  const tags = profile?.style_descriptors ?? [];
+  if (tags.length === 0) return null;
+  return tags[attemptIndex % tags.length];
 }
 
 // Generates a daily outfit by calling the existing /api/outfits/generate
-// handler directly (no HTTP round-trip). Returns { outfitId } or null.
-async function generateDailyOutfit({ userId, slot, dateStr, location }) {
+// handler directly (no HTTP round-trip). Accepts optional shuffle-variety
+// hints — excludeItemIds (don't re-use these) and aestheticEmphasis (which
+// style tag to lean into). Returns { outfitId } or null.
+async function generateDailyOutfit({ userId, slot, dateStr, location, excludeItemIds, aestheticEmphasis }) {
   const eventDescription = eventDescriptionForSlot(slot, dateStr);
-  const body = { userId, eventDescription, location: location || undefined, date: dateStr };
-  const req  = new Request("http://internal/api/outfits/generate", {
+  const body = {
+    userId,
+    eventDescription,
+    location: location || undefined,
+    date:     dateStr,
+    excludeItemIds:    Array.isArray(excludeItemIds) && excludeItemIds.length > 0 ? excludeItemIds : undefined,
+    aestheticEmphasis: aestheticEmphasis || undefined,
+  };
+  const req = new Request("http://internal/api/outfits/generate", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(body),
@@ -76,6 +96,24 @@ async function generateDailyOutfit({ userId, slot, dateStr, location }) {
     console.error(`[daily-outfits] generate threw for slot=${slot}:`, err);
     return null;
   }
+}
+
+// Read user's style_descriptors once per request — used to compute the
+// per-shuffle aesthetic emphasis.
+async function getUserStyleDescriptors(userId) {
+  const { data } = await supabaseAdmin
+    .from("user_profiles")
+    .select("style_descriptors")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.style_descriptors ?? [];
+}
+
+// Given an outfit row joined into the daily_outfits result, extract the
+// item_ids it selected. Used to build the exclude list for the next shuffle.
+function selectedItemIdsFromOutfit(outfit) {
+  const sel = outfit?.generated_outfit?.selected_items ?? [];
+  return sel.map((s) => s?.item_id).filter(Boolean);
 }
 
 // Look up a user's default city for the weather block. Optional; missing is fine.
@@ -140,12 +178,20 @@ export async function GET(request) {
 
   const bySlot = Object.fromEntries((rows ?? []).map((r) => [r.slot, r]));
 
-  // Generate any missing slots in parallel
+  // Generate any missing slots in parallel. Initial generation uses
+  // aesthetic emphasis from the user's first style descriptor (attempt 0).
   const missing = ["daytime", "evening"].filter((s) => !bySlot[s]);
   if (missing.length > 0) {
-    const location = await getUserLocation(userId);
+    const [location, descriptors] = await Promise.all([
+      getUserLocation(userId),
+      getUserStyleDescriptors(userId),
+    ]);
+    const initialEmphasis = aestheticEmphasisFor({ style_descriptors: descriptors }, 0);
+
     const generated = await Promise.all(
-      missing.map((slot) => generateDailyOutfit({ userId, slot, dateStr, location }))
+      missing.map((slot) =>
+        generateDailyOutfit({ userId, slot, dateStr, location, aestheticEmphasis: initialEmphasis })
+      )
     );
 
     for (let i = 0; i < missing.length; i++) {
@@ -195,10 +241,11 @@ export async function POST(request) {
 
   const limit = shuffleLimitForUser(userId);
 
-  // Fetch the current row for this slot/date
+  // Fetch the current row + the outfit it points at (so we can extract its
+  // items for the exclusion list passed to the next generation).
   const { data: existing } = await supabaseAdmin
     .from("daily_outfits")
-    .select("*")
+    .select("*, outfit:outfits(*)")
     .eq("user_id", userId)
     .eq("generated_for_date", dateStr)
     .eq("slot", slot)
@@ -212,19 +259,44 @@ export async function POST(request) {
     );
   }
 
-  // Generate a fresh outfit
-  const location = await getUserLocation(userId);
-  const gen      = await generateDailyOutfit({ userId, slot, dateStr, location });
+  // Build the shuffle-variety hints:
+  //   - excludeItemIds: items from the outfit being replaced (don't repeat)
+  //   - aestheticEmphasis: cycle to the next style descriptor on each attempt
+  const nextAttemptIndex = currentCount + 1; // 1 = first shuffle, 2 = second, ...
+  const previousItemIds  = existing
+    ? selectedItemIdsFromOutfit(existing.outfit)
+    : [];
+
+  const [location, descriptors] = await Promise.all([
+    getUserLocation(userId),
+    getUserStyleDescriptors(userId),
+  ]);
+  const emphasis = aestheticEmphasisFor({ style_descriptors: descriptors }, nextAttemptIndex);
+
+  const gen = await generateDailyOutfit({
+    userId,
+    slot,
+    dateStr,
+    location,
+    excludeItemIds:    previousItemIds,
+    aestheticEmphasis: emphasis,
+  });
   if (!gen) {
     return Response.json({ error: "Generation failed" }, { status: 500 });
   }
 
-  // Update existing row or insert new one
+  // Update existing row or insert new one. previous_outfit_item_ids records
+  // the items we just excluded (the outfit being replaced) — both for
+  // analytics and as a stored audit trail of what was suggested.
   let saved;
   if (existing) {
     const { data } = await supabaseAdmin
       .from("daily_outfits")
-      .update({ outfit_id: gen.outfitId, shuffle_count: currentCount + 1 })
+      .update({
+        outfit_id:                gen.outfitId,
+        shuffle_count:            currentCount + 1,
+        previous_outfit_item_ids: previousItemIds,
+      })
       .eq("id", existing.id)
       .select("*, outfit:outfits(*)")
       .single();
@@ -233,11 +305,12 @@ export async function POST(request) {
     const { data } = await supabaseAdmin
       .from("daily_outfits")
       .insert({
-        user_id:            userId,
-        outfit_id:          gen.outfitId,
-        generated_for_date: dateStr,
+        user_id:                  userId,
+        outfit_id:                gen.outfitId,
+        generated_for_date:       dateStr,
         slot,
-        shuffle_count:      1, // first generation via shuffle counts as 1
+        shuffle_count:            1, // first generation via shuffle counts as 1
+        previous_outfit_item_ids: [],
       })
       .select("*, outfit:outfits(*)")
       .single();

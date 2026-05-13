@@ -143,7 +143,15 @@ function formatDateForPrompt(dateStr) {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request) {
-  const { userId, eventDescription, location, date, inspirationImageUrl } = await request.json();
+  const {
+    userId,
+    eventDescription,
+    location,
+    date,
+    inspirationImageUrl,
+    excludeItemIds,
+    aestheticEmphasis,
+  } = await request.json();
 
   if (!userId || !eventDescription?.trim()) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
@@ -193,6 +201,22 @@ export async function POST(request) {
       )
     : ["(Wardrobe is empty — no items to select from.)"];
 
+  // Styling-direction block — caller may pass an aesthetic emphasis (e.g.
+  // "Minimalist") and/or a list of item_ids to avoid (typically items the
+  // user just saw in a daily-outfit shuffle). Both are optional; when neither
+  // is set, the block is empty and the prompt is unchanged from prior behavior.
+  const stylingLines = [
+    aestheticEmphasis && typeof aestheticEmphasis === "string"
+      ? `- Lean into the ${aestheticEmphasis.toLowerCase()} side of this user's style for today's look.`
+      : null,
+    Array.isArray(excludeItemIds) && excludeItemIds.length > 0
+      ? `- Avoid these specific item_ids — the user just saw them and wants something visually different: ${excludeItemIds.join(", ")}`
+      : null,
+  ].filter(Boolean);
+  const stylingDirectionBlock = stylingLines.length > 0
+    ? `\nTODAY'S STYLING DIRECTION:\n${stylingLines.join("\n")}\n`
+    : "";
+
   // Inspiration block — only present when an Unsplash URL was passed AND
   // host-allowlist accepted it. Tells Claude to drive the look from the image
   // and constrain missing_items to pieces actually visible there.
@@ -227,7 +251,7 @@ Factor this weather into your outfit selection:
   const userPrompt = `Build an outfit for this occasion: "${eventDescription.trim()}"${
     location ? `\nLocation: ${location}` : ""
   }${date ? `\nDate: ${formatDateForPrompt(date)}` : ""}
-${weatherBlock}${inspirationBlock}
+${weatherBlock}${inspirationBlock}${stylingDirectionBlock}
 STYLE PROFILE:
 ${profileLines.join("\n")}
 

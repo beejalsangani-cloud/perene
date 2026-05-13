@@ -3,13 +3,49 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
-function buildQuery(profile) {
-  if (!profile) return "fashion editorial";
-  const descriptors = profile.style_descriptors ?? [];
-  const events      = profile.typical_events ?? [];
-  const combined    = [...descriptors.slice(0, 2), ...events.slice(0, 1)];
-  if (!combined.length) return "fashion editorial";
-  return combined.join(" ") + " outfit";
+// ── Profile → Unsplash query helpers ─────────────────────────────────────────
+// Discover personalizes search by mapping quiz answers to keywords:
+//   - gender             → menswear / womenswear / androgynous fashion (or skip)
+//   - style_descriptors  → first 2 words verbatim (caps query length)
+//   - typical_events     → one query PER occasion, results pooled
+//
+// The fan-out below in `load(p)` means a user with N occasions triggers N
+// parallel Unsplash calls per dashboard load. Each bucket returns 12 photos;
+// we take only `quotas[i]` from each and gap-fill from leftovers if a bucket
+// is short. Final list is deduped by photo id and shuffled so occasions
+// appear interleaved, not in rigid blocks.
+
+function genderTerm(g) {
+  if (g === "Man")        return "menswear";
+  if (g === "Woman")      return "womenswear";
+  if (g === "Non-binary") return "androgynous fashion";
+  return null; // "Prefer not to say" or unset → no gender keyword
+}
+
+function buildOccasionQuery(profile, occasion) {
+  const parts = [
+    genderTerm(profile?.gender),
+    ...(profile?.style_descriptors ?? []).slice(0, 2),
+    occasion ?? "editorial",
+  ].filter(Boolean);
+  return parts.join(" ") + " outfit";
+}
+
+// Distribute `total` items across `n` buckets as evenly as possible.
+// e.g. (12, 5) → [3, 3, 2, 2, 2]; (12, 7) → [2, 2, 2, 2, 2, 1, 1].
+function planQuotas(total, n) {
+  if (n <= 0) return [];
+  const base  = Math.floor(total / n);
+  const extra = total % n;
+  return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+// Fisher-Yates, in place.
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
 }
 
 // ── Image modal ───────────────────────────────────────────────────────────────
@@ -96,19 +132,68 @@ export default function InspirationFeed({ profile }) {
   const [loading, setLoading] = useState(true);
   const [page,    setPage]    = useState(1);
   const [active,  setActive]  = useState(null); // open modal photo
-  const query = buildQuery(profile);
 
   const load = useCallback(async (p) => {
     setLoading(true);
-    try {
-      const res  = await fetch(`/api/inspiration?q=${encodeURIComponent(query)}&page=${p}`);
-      const data = await res.json();
-      if (data.photos) {
-        setPhotos(p === 1 ? data.photos : (prev) => [...prev, ...data.photos]);
+    const events = profile?.typical_events ?? [];
+    const PHOTOS = 12;
+
+    // No occasions on profile → single generic query (preserves prior behavior,
+    // now with the gender keyword prepended if available).
+    if (events.length === 0) {
+      try {
+        const q    = buildOccasionQuery(profile, null);
+        const res  = await fetch(`/api/inspiration?q=${encodeURIComponent(q)}&page=${p}`);
+        const data = await res.json().catch(() => ({}));
+        if (data.photos) {
+          setPhotos(p === 1 ? data.photos : (prev) => [...prev, ...data.photos]);
+        }
+      } catch { /* silent */ }
+      setLoading(false);
+      return;
+    }
+
+    // Fan out: one Unsplash query per occasion, in parallel. A bucket that
+    // errors contributes 0 photos; the gap-fill loop below recovers from
+    // adjacent buckets that returned surplus.
+    const buckets = await Promise.all(events.map(async (occasion) => {
+      try {
+        const q   = buildOccasionQuery(profile, occasion);
+        const res = await fetch(`/api/inspiration?q=${encodeURIComponent(q)}&page=${p}`);
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data = await res.json();
+        return data.photos ?? [];
+      } catch (err) {
+        console.error(`[inspiration] failed for occasion "${occasion}":`, err);
+        return [];
       }
-    } catch { /* silent */ }
+    }));
+
+    // Quota-balanced pick, then gap-fill from leftovers if any bucket fell short.
+    const quotas = planQuotas(PHOTOS, events.length);
+    const picked = [];
+    for (let i = 0; i < buckets.length; i++) {
+      picked.push(...buckets[i].slice(0, quotas[i]));
+    }
+    let shortfall = PHOTOS - picked.length;
+    if (shortfall > 0) {
+      for (let i = 0; i < buckets.length && shortfall > 0; i++) {
+        const leftover = buckets[i].slice(quotas[i]);
+        const take = Math.min(shortfall, leftover.length);
+        picked.push(...leftover.slice(0, take));
+        shortfall -= take;
+      }
+    }
+
+    // Dedupe by photo id (same image can surface across related queries),
+    // then shuffle so occasions appear interleaved rather than in blocks.
+    const seen = new Set();
+    const deduped = picked.filter((ph) => seen.has(ph.id) ? false : (seen.add(ph.id), true));
+    shuffleInPlace(deduped);
+
+    setPhotos((prev) => p === 1 ? deduped : [...prev, ...deduped]);
     setLoading(false);
-  }, [query]);
+  }, [profile]);
 
   useEffect(() => { load(1); }, [load]);
 

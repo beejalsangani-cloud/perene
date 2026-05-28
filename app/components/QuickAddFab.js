@@ -246,12 +246,14 @@ export default function QuickAddFab({ user, onItemAdded }) {
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
 
-      {/* Floating button — mobile only (hidden md+) */}
+      {/* Floating button — mobile only (hidden md+). z-[51] so it sits above
+          the InstallPrompt banner (z-50) which also lives at the bottom of
+          the screen on first-visit iOS Safari. */}
       <button
         type="button"
         aria-label="Add to closet"
         onClick={openCamera}
-        className="md:hidden fixed right-5 bottom-5 z-40 w-14 h-14 rounded-full bg-[#2A3D2E] text-[#F5F1E8] flex items-center justify-center shadow-xl shadow-[#2A3D2E]/30 active:scale-95 transition-transform"
+        className="md:hidden fixed right-5 z-[51] w-14 h-14 rounded-full bg-[#C4E552] text-[#2A3D2E] flex items-center justify-center shadow-xl shadow-[#2A3D2E]/30 active:scale-95 transition-transform"
         style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
       >
         <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7">

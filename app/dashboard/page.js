@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,7 @@ import WearPrompt from "@/app/components/WearPrompt";
 import SavedLooksCard from "@/app/components/SavedLooksCard";
 import InstallPrompt from "@/app/components/InstallPrompt";
 import NotificationOptIn from "@/app/components/NotificationOptIn";
+import QuickAddFab from "@/app/components/QuickAddFab";
 // 2026-05-04: WeeklyCalendar card hidden on dashboard. Component file + weather APIs remain; re-enable by uncommenting this import and the JSX block below.
 // import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
@@ -171,6 +172,70 @@ function ProfileCard({ profile }) {
   );
 }
 
+// "Your Closet" tile — visual variant of FeatureTile that previews up to 6
+// recent item thumbnails in a horizontal scroll. Falls back to a plain
+// upload prompt when the closet is empty. The whole card navigates to /wardrobe.
+function WardrobePreviewTile({ count, thumbnails }) {
+  const isEmpty  = count === 0;
+  const isLoading = count === null;
+
+  return (
+    <Link
+      href={isEmpty ? "/wardrobe#upload" : "/wardrobe"}
+      className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-7 flex flex-col gap-4 active:scale-[0.99] transition-transform"
+      style={{ fontFamily: "var(--font-inter)" }}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-[#2A3D2E]" style={{ fontFamily: "var(--font-playfair)" }}>Your Closet</h3>
+        <span className="text-[#C9A87C] text-xs font-bold">→</span>
+      </div>
+
+      {isLoading ? (
+        // Skeleton row matching the thumbnail layout below
+        <div className="flex gap-2 overflow-hidden">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="w-[60px] h-[60px] flex-shrink-0 rounded-xl bg-[#2A3D2E]/6 animate-pulse"/>
+          ))}
+        </div>
+      ) : isEmpty ? (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-12 h-12 rounded-xl bg-[#C4E552]/25 flex items-center justify-center text-[#2A3D2E] flex-shrink-0">
+            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <p className="text-sm text-[#2A3D2E]/70 leading-snug">
+            Your closet is empty — <span className="font-semibold text-[#2A3D2E]">add your first piece</span>.
+          </p>
+        </div>
+      ) : (
+        // Horizontal scroll row of thumbnails (6 fit on most phone widths; scroll for more)
+        <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(thumbnails ?? []).map((t, i) => (
+            <div key={t.id ?? i} className="w-[60px] h-[60px] flex-shrink-0 rounded-xl overflow-hidden bg-[#EDE7D6] border border-[#2A3D2E]/8">
+              {t.signedUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={t.signedUrl} alt="" className="w-full h-full object-cover"/>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[#2A3D2E]/25 text-lg">✦</div>
+              )}
+            </div>
+          ))}
+          {count > (thumbnails?.length ?? 0) && (
+            <div className="w-[60px] h-[60px] flex-shrink-0 rounded-xl bg-[#2A3D2E]/6 flex items-center justify-center text-[#2A3D2E]/55 text-xs font-bold">
+              +{count - (thumbnails?.length ?? 0)}
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-xs text-[#2A3D2E]/55 mt-auto">
+        {isLoading ? "Loading…" : isEmpty ? "Start building your wardrobe" : `${count} item${count === 1 ? "" : "s"} in your closet`}
+      </p>
+    </Link>
+  );
+}
+
 function FeatureTile({ icon, title, stat, cta, href, disabled = false, disabledLabel = "Coming soon", disabledTitle }) {
   return (
     <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-7 flex flex-col gap-5"
@@ -205,6 +270,7 @@ export default function DashboardPage() {
   const [user,            setUser]            = useState(null);
   const [profile,         setProfile]         = useState(undefined); // undefined = loading
   const [wardrobeCount,   setWardrobeCount]   = useState(null);
+  const [wardrobeThumbs,  setWardrobeThumbs]  = useState(null);      // [{ id, image_url, signedUrl }] | null = loading
   const [savedCount,      setSavedCount]      = useState(null);      // for the Saved Looks feature tile
   const [authReady,       setAuthReady]       = useState(false);
   // Managed separately so LocationSetup can update it without a full profile re-fetch
@@ -246,6 +312,37 @@ export default function DashboardPage() {
       setSavedCount(savedRes.count ?? 0);
     });
   }, [authReady, user]);
+
+  // Recent-item thumbnails for the wardrobe preview tile. 6 most recent items,
+  // signed for 1h. Refetched when the FAB adds a new item.
+  const loadWardrobeThumbs = useCallback(async (uid) => {
+    const { data } = await supabase
+      .from("wardrobe_items")
+      .select("id, image_url")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(6);
+    if (!data?.length) { setWardrobeThumbs([]); return; }
+
+    const { data: signed } = await supabase.storage
+      .from("wardrobe")
+      .createSignedUrls(data.map((i) => i.image_url), 3600);
+    const urlMap = Object.fromEntries(
+      (signed ?? []).map(({ path, signedUrl }) => [path, signedUrl])
+    );
+    setWardrobeThumbs(data.map((i) => ({ ...i, signedUrl: urlMap[i.image_url] ?? null })));
+  }, []);
+
+  useEffect(() => {
+    if (!authReady || !user) return;
+    loadWardrobeThumbs(user.id);
+  }, [authReady, user, loadWardrobeThumbs]);
+
+  // Called by QuickAddFab after a successful save — bump count and refresh thumbnails
+  function handleItemAdded() {
+    setWardrobeCount((prev) => (prev ?? 0) + 1);
+    if (user) loadWardrobeThumbs(user.id);
+  }
 
   if (!authReady) {
     return (
@@ -357,18 +454,7 @@ export default function DashboardPage() {
               Your wardrobe
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FeatureTile
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-                    <path d="M3 9l9-7 9 7v11a1 1 0 01-1 1H4a1 1 0 01-1-1V9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                    <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                  </svg>
-                }
-                title="Your Closet"
-                stat={wardrobeCount === null ? "Loading…" : `${wardrobeCount} item${wardrobeCount === 1 ? "" : "s"} uploaded`}
-                cta="Go to closet →"
-                href="/wardrobe"
-              />
+              <WardrobePreviewTile count={wardrobeCount} thumbnails={wardrobeThumbs}/>
               <FeatureTile
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
@@ -430,6 +516,9 @@ export default function DashboardPage() {
         )}
 
       </main>
+
+      {/* Mobile-only floating "+" — camera → Vision auto-tag → confirm sheet */}
+      {user && <QuickAddFab user={user} onItemAdded={handleItemAdded}/>}
     </div>
   );
 }

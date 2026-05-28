@@ -1,20 +1,17 @@
 "use client";
 
 // Today's Outfits — two-slot daily AI generation rendered above the
-// Style Profile / Your Wardrobe grid. Pulls from /api/daily-outfits:
-//   GET  → fetch (auto-generates missing slots)
-//   POST → /shuffle to regenerate a slot
+// Style Profile / Your Wardrobe grid. Pulls from /api/daily-outfits (GET).
+// Cards are image-first magazine covers: hero photo with the label, overall
+// vibe, and a single "See full look" CTA overlaid via a bottom gradient.
 //
 // Empty-closet (<5 items) and insufficient-pieces-for-slot fallbacks are
-// rendered inline. Shuffle limit (3/slot/day for free tier) comes from the
-// API so we don't have to know about tiers on the client.
+// rendered inline.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import SaveButton from "@/app/components/SaveButton";
-
-const SHUFFLE_LIMIT_FALLBACK = 3;
 
 function todayLocalForDailyOutfits() {
   // The day boundary for "today's outfits" is 4am local time — before 4am we
@@ -29,13 +26,6 @@ function todayLocalForDailyOutfits() {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function firstSentence(text) {
-  if (!text) return "";
-  const t = text.trim();
-  const match = t.match(/^[^.!?]+[.!?]/);
-  return (match ? match[0] : t).trim();
-}
-
 async function getAuthHeader() {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
@@ -43,18 +33,19 @@ async function getAuthHeader() {
 }
 
 // ── Collage ─────────────────────────────────────────────────────────────────
-// Up to 4 wardrobe images in an asymmetric layout: 1 hero left, up to 3
-// stacked thumbs right. Matches the visual pattern from /outfits index.
+// Magazine-cover style — a single tall hero image (or asymmetric grid when 2+
+// items are available). 4:5 portrait aspect makes each card feel like an
+// editorial cover on mobile.
 function Collage({ urls }) {
   const safe = (urls ?? []).filter(Boolean);
   if (safe.length === 0) {
     return (
-      <div className="aspect-[4/3] bg-[#EDE7D6] flex items-center justify-center text-[#2A3D2E]/20 text-3xl select-none">✦</div>
+      <div className="aspect-[4/5] bg-gradient-to-br from-[#EDE7D6] to-[#C9A87C]/25 flex items-center justify-center text-[#2A3D2E]/20 text-4xl select-none">✦</div>
     );
   }
   if (safe.length === 1) {
     return (
-      <div className="aspect-[4/3] overflow-hidden bg-[#EDE7D6]">
+      <div className="aspect-[4/5] overflow-hidden bg-[#EDE7D6]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={safe[0]} alt="" className="w-full h-full object-cover"/>
       </div>
@@ -62,7 +53,7 @@ function Collage({ urls }) {
   }
   if (safe.length === 2) {
     return (
-      <div className="aspect-[4/3] grid grid-cols-2 gap-px bg-[#EDE7D6]">
+      <div className="aspect-[4/5] grid grid-cols-2 gap-px bg-[#EDE7D6]">
         {safe.map((u, i) => (
           <div key={i} className="overflow-hidden bg-[#EDE7D6]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -74,7 +65,7 @@ function Collage({ urls }) {
   }
   const right = safe.slice(1, 4);
   return (
-    <div className="aspect-[4/3] grid grid-cols-3 gap-px bg-[#EDE7D6]">
+    <div className="aspect-[4/5] grid grid-cols-3 gap-px bg-[#EDE7D6]">
       <div className="col-span-2 overflow-hidden bg-[#EDE7D6]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={safe[0]} alt="" className="w-full h-full object-cover"/>
@@ -93,97 +84,96 @@ function Collage({ urls }) {
 
 // ── Slot card ──────────────────────────────────────────────────────────────
 
-function SlotCard({ label, slot, payload, onShuffle, shuffling, signedItemUrls }) {
+function SlotCard({ label, payload, signedItemUrls }) {
   if (!payload) {
     return <SlotSkeleton label={label}/>;
   }
 
-  const outfit          = payload.outfit;
-  const selectedItems   = outfit?.generated_outfit?.selected_items ?? [];
-  const shuffleCount    = payload.shuffle_count ?? 0;
-  const shuffleLimit    = payload.shuffle_limit ?? SHUFFLE_LIMIT_FALLBACK;
-  const shufflesLeft    = Math.max(0, shuffleLimit - shuffleCount);
-  const atLimit         = shuffleCount >= shuffleLimit;
+  const outfit        = payload.outfit;
+  const selectedItems = outfit?.generated_outfit?.selected_items ?? [];
 
   // Insufficient-items-for-slot fallback: AI returned < 3 selected items.
+  // Render as a placeholder card with the same magazine shape as a real card
+  // (gradient fills the image area, CTAs overlay the bottom).
   if (selectedItems.length < 3) {
     return (
       <div
-        className="rounded-2xl border border-[#2A3D2E]/8 bg-white p-6 flex flex-col gap-4"
+        className="rounded-2xl border border-[#2A3D2E]/8 overflow-hidden flex flex-col relative"
         style={{ fontFamily: "var(--font-inter)" }}
       >
-        <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest">{label}</p>
-        <p className="text-sm text-[#2A3D2E]/70 leading-relaxed">
-          You don&apos;t have enough {label.toLowerCase()} pieces yet — Perene needs a few more options to style this slot.
-        </p>
-        <div className="flex flex-wrap gap-2 mt-auto pt-2">
-          <Link
-            href="/wardrobe#upload"
-            className="px-4 py-2.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-xs hover:bg-[#d4f562] transition-colors"
-          >
-            Add to closet →
-          </Link>
-          <Link
-            href={`/outfits/${payload.outfit_id}`}
-            className="px-4 py-2.5 rounded-full border border-[#2A3D2E]/15 text-[#2A3D2E]/65 font-semibold text-xs hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] transition-colors"
-          >
-            Shop the look →
-          </Link>
+        <div className="aspect-[4/5] bg-gradient-to-br from-[#EDE7D6] via-[#C9A87C]/20 to-[#2A3D2E]/12 flex items-center justify-center">
+          <span className="text-[#C9A87C]/45 text-5xl select-none">✦</span>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 p-5 pt-12 bg-gradient-to-t from-[#2A3D2E]/85 via-[#2A3D2E]/55 to-transparent flex flex-col gap-2">
+          <p className="text-[10px] font-bold text-[#C4E552] uppercase tracking-[0.18em]">{label}</p>
+          <p className="text-sm text-[#F5F1E8] font-medium leading-snug mb-2">
+            Not enough {label.toLowerCase()} pieces yet.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/wardrobe#upload"
+              className="px-3.5 py-2 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-xs hover:bg-[#d4f562] transition-colors"
+            >
+              Add to closet →
+            </Link>
+            <Link
+              href={`/outfits/${payload.outfit_id}`}
+              className="px-3.5 py-2 rounded-full border border-[#F5F1E8]/35 text-[#F5F1E8] font-semibold text-xs hover:bg-[#F5F1E8]/10 transition-colors"
+            >
+              Shop the look →
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  const description   = firstSentence(outfit?.generated_outfit?.styling_reasoning);
-  const collageUrls   = selectedItems
+  const collageUrls = selectedItems
     .slice(0, 4)
     .map((s) => signedItemUrls[s.item_id])
     .filter(Boolean);
+  const vibe = outfit?.generated_outfit?.overall_vibe;
 
+  // Card is a div; an absolutely-positioned <Link> covers the full surface for
+  // tap-to-navigate. The SaveButton renders as a SIBLING on a higher z-index
+  // so it doesn't end up as a <button> nested inside an <a> (invalid HTML).
   return (
     <div
-      className="rounded-2xl border border-[#2A3D2E]/8 bg-white overflow-hidden flex flex-col"
+      className="group rounded-2xl border border-[#2A3D2E]/8 bg-white overflow-hidden relative"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      <div className="relative">
-        <Collage urls={collageUrls}/>
-        <div className="absolute top-2.5 right-2.5">
-          <SaveButton
-            outfitId={payload.outfit_id}
-            initialSaved={!!outfit?.is_saved}
-            variant="icon"
-          />
-        </div>
+      <Collage urls={collageUrls}/>
+
+      {/* Full-card tap target. inset-0 so any tap on the card navigates;
+          z-0 keeps it below the SaveButton overlay. */}
+      <Link
+        href={`/outfits/${payload.outfit_id}`}
+        aria-label={`See full ${label.toLowerCase()} look`}
+        className="absolute inset-0 z-0 active:scale-[0.99] transition-transform"
+      />
+
+      {/* Save button — sibling of the Link, higher z-index */}
+      <div className="absolute top-3 right-3 z-20">
+        <SaveButton
+          outfitId={payload.outfit_id}
+          initialSaved={!!outfit?.is_saved}
+          variant="icon"
+        />
       </div>
-      <div className="p-5 flex flex-col gap-3 flex-1">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-[#C9A87C] uppercase tracking-widest">{label}</p>
-          {outfit?.generated_outfit?.overall_vibe && (
-            <span className="text-[10px] italic text-[#2A3D2E]/45 truncate ml-2">
-              {outfit.generated_outfit.overall_vibe}
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-[#2A3D2E]/70 leading-relaxed line-clamp-3 flex-1">
-          {description || `Today's ${label.toLowerCase()} look from your closet.`}
-        </p>
-        <div className="flex flex-wrap items-center gap-2 mt-auto pt-1">
-          <Link
-            href={`/outfits/${payload.outfit_id}`}
-            className="px-4 py-2.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-xs hover:bg-[#d4f562] transition-colors"
-          >
-            See full look →
-          </Link>
-          <button
-            type="button"
-            onClick={() => onShuffle(slot)}
-            disabled={atLimit || shuffling}
-            title={atLimit ? `You've used your shuffles for today — come back tomorrow.` : `${shufflesLeft} shuffle${shufflesLeft === 1 ? "" : "s"} left`}
-            className="px-4 py-2.5 rounded-full border border-[#2A3D2E]/15 text-[#2A3D2E]/65 font-semibold text-xs hover:border-[#2A3D2E]/30 hover:text-[#2A3D2E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            {shuffling ? "Shuffling…" : atLimit ? "No shuffles left" : `Shuffle (${shufflesLeft})`}
-          </button>
-        </div>
+
+      {/* Bottom gradient + magazine-cover overlay: label, vibe, single CTA chip.
+          pointer-events-none on the overlay container lets the Link below it
+          receive the tap; the chip itself is purely visual. */}
+      <div className="absolute inset-x-0 bottom-0 p-5 pt-16 bg-gradient-to-t from-[#2A3D2E]/90 via-[#2A3D2E]/45 to-transparent flex flex-col gap-2.5 pointer-events-none z-10">
+        <p className="text-[10px] font-bold text-[#C4E552] uppercase tracking-[0.18em]">{label}</p>
+        {vibe && (
+          <p className="text-base font-bold text-[#F5F1E8] leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+            {vibe}
+          </p>
+        )}
+        <span className="self-start mt-1 px-3.5 py-1.5 rounded-full bg-[#C4E552] text-[#2A3D2E] font-bold text-xs">
+          See full look →
+        </span>
       </div>
     </div>
   );
@@ -193,16 +183,12 @@ function SlotCard({ label, slot, payload, onShuffle, shuffling, signedItemUrls }
 
 function SlotSkeleton({ label }) {
   return (
-    <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white overflow-hidden animate-pulse">
-      <div className="aspect-[4/3] bg-[#2A3D2E]/6"/>
-      <div className="p-5 flex flex-col gap-2.5">
-        <div className="h-3 w-20 rounded-full bg-[#C9A87C]/30"/>
-        <div className="h-3 w-3/4 rounded-full bg-[#2A3D2E]/8"/>
-        <div className="h-3 w-2/3 rounded-full bg-[#2A3D2E]/8"/>
-        <div className="flex gap-2 pt-2">
-          <div className="h-7 w-24 rounded-full bg-[#C4E552]/30"/>
-          <div className="h-7 w-20 rounded-full bg-[#2A3D2E]/8"/>
-        </div>
+    <div className="rounded-2xl border border-[#2A3D2E]/8 bg-white overflow-hidden animate-pulse relative">
+      <div className="aspect-[4/5] bg-[#2A3D2E]/6"/>
+      <div className="absolute inset-x-0 bottom-0 p-5 flex flex-col gap-2">
+        <div className="h-2.5 w-16 rounded-full bg-[#C9A87C]/30"/>
+        <div className="h-4 w-2/3 rounded-full bg-[#2A3D2E]/12"/>
+        <div className="h-7 w-28 rounded-full bg-[#C4E552]/30 mt-1"/>
       </div>
     </div>
   );
@@ -237,7 +223,6 @@ function EmptyClosetCard({ count, minimum }) {
 
 export default function TodaysOutfits({ user }) {
   const [data,           setData]           = useState(null); // null = loading
-  const [shufflingSlot,  setShufflingSlot]  = useState(null);
   const [error,          setError]          = useState("");
   const [signedItemUrls, setSignedItemUrls] = useState({});
 
@@ -291,32 +276,6 @@ export default function TodaysOutfits({ user }) {
     load();
   }, [user, load]);
 
-  async function handleShuffle(slot) {
-    if (shufflingSlot) return;
-    setShufflingSlot(slot);
-    try {
-      const auth = await getAuthHeader();
-      const res  = await fetch("/api/daily-outfits", {
-        method:  "POST",
-        headers: { ...auth, "Content-Type": "application/json" },
-        body:    JSON.stringify({ slot, date: dateStr }),
-      });
-      if (res.status === 429) {
-        // Limit reached — refresh state so the button locks
-        await load();
-        return;
-      }
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      const { slot: updated } = await res.json();
-      setData((prev) => prev ? { ...prev, [slot]: updated } : prev);
-      resolveItemUrls({ ...data, [slot]: updated });
-    } catch (err) {
-      console.error(`[TodaysOutfits] shuffle ${slot} failed:`, err);
-    } finally {
-      setShufflingSlot(null);
-    }
-  }
-
   // Loading skeleton
   if (data === null) {
     return (
@@ -355,19 +314,13 @@ export default function TodaysOutfits({ user }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SlotCard
           label="Daytime"
-          slot="daytime"
           payload={data.daytime}
           signedItemUrls={signedItemUrls}
-          onShuffle={handleShuffle}
-          shuffling={shufflingSlot === "daytime"}
         />
         <SlotCard
           label="Evening"
-          slot="evening"
           payload={data.evening}
           signedItemUrls={signedItemUrls}
-          onShuffle={handleShuffle}
-          shuffling={shufflingSlot === "evening"}
         />
       </div>
     </section>

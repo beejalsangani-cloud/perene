@@ -12,6 +12,8 @@ import StyleTips from "@/app/components/StyleTips";
 import TodaysOutfits from "@/app/components/TodaysOutfits";
 import WearPrompt from "@/app/components/WearPrompt";
 import SavedLooksCard from "@/app/components/SavedLooksCard";
+import InstallPrompt from "@/app/components/InstallPrompt";
+import NotificationOptIn from "@/app/components/NotificationOptIn";
 // 2026-05-04: WeeklyCalendar card hidden on dashboard. Component file + weather APIs remain; re-enable by uncommenting this import and the JSX block below.
 // import WeeklyCalendar from "@/app/components/WeeklyCalendar";
 
@@ -266,6 +268,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
       <DashboardNav user={user}/>
+      <InstallPrompt/>
 
       <main className="max-w-5xl mx-auto px-6 md:px-10 py-10 md:py-14">
 
@@ -323,6 +326,9 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+
+        {/* ── Notification opt-in (push foundation, post-onboarding) ──── */}
+        {user && wardrobeCount !== null && wardrobeCount >= 1 && <NotificationOptIn/>}
 
         {/* ── "Did you wear yesterday's look?" prompt ────────────────── */}
         {user && <WearPrompt user={user}/>}

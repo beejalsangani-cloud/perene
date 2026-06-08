@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { authHeader } from "@/lib/supabase";
 
 const CATEGORY_COLORS = {
   Color:       "bg-[#F4B8D0]/30 text-[#C050A0]",
@@ -60,15 +61,21 @@ export default function StyleTips({ userId }) {
 
   useEffect(() => {
     if (!userId) return;
-    fetch("/api/tips", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ userId }),
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.tips) setTips(data.tips); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const res = await fetch("/api/tips", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body:    JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (data.tips) setTips(data.tips);
+      } catch {
+        /* non-blocking — tips are best-effort */
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [userId]);
 
   if (loading)       return <TipsSkeleton />;

@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import imageCompression from "browser-image-compression";
-import { supabase } from "@/lib/supabase";
+import { supabase, authHeader } from "@/lib/supabase";
 import { CATEGORIES, SEASONS, COLORS } from "@/app/wardrobe/UploadModal";
 
 // ── Helpers (mirror UploadModal.js — kept local so this component is standalone) ──
@@ -137,11 +137,10 @@ export default function QuickAddFab({ user, onItemAdded }) {
     try {
       res = await fetch("/api/wardrobe/process", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body:    JSON.stringify({
           imageBase64: base64,
           mediaType:   compressed.type || "image/jpeg",
-          userId:      user.id,
         }),
       });
     } catch {

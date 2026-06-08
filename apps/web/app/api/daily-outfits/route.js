@@ -7,12 +7,12 @@
 //        Regenerates the slot's outfit and increments shuffle_count. Enforces
 //        the per-tier shuffle ceiling (free tier = 3).
 //
-// Generation reuses the existing /api/outfits/generate handler by importing
-// its POST function — keeps the prompt-building + Claude call in one place
-// (no duplication, no behavior change to manual outfit generation).
+// Generation reuses the shared core in lib/generate-outfit — the same function
+// the /api/outfits/generate route calls — so the prompt-building + Claude call
+// live in one place (no duplication, no in-process HTTP round-trip).
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { POST as generateOutfitPOST } from "@/app/api/outfits/generate/route";
+import { generateOutfit } from "@/lib/generate-outfit";
 
 const CLOSET_MINIMUM_FOR_DAILY = 5;
 const SHUFFLE_LIMIT_FREE       = 3;
@@ -64,34 +64,26 @@ function aestheticEmphasisFor(profile, attemptIndex) {
   return tags[attemptIndex % tags.length];
 }
 
-// Generates a daily outfit by calling the existing /api/outfits/generate
-// handler directly (no HTTP round-trip). Accepts optional shuffle-variety
-// hints — excludeItemIds (don't re-use these) and aestheticEmphasis (which
-// style tag to lean into). Returns { outfitId } or null.
+// Generates a daily outfit by calling the shared generation core directly.
+// Accepts optional shuffle-variety hints — excludeItemIds (don't re-use these)
+// and aestheticEmphasis (which style tag to lean into). Returns { outfitId } or
+// null. userId here is already authenticated (verified upstream in GET/POST).
 async function generateDailyOutfit({ userId, slot, dateStr, location, excludeItemIds, aestheticEmphasis }) {
   const eventDescription = eventDescriptionForSlot(slot, dateStr);
-  const body = {
-    userId,
-    eventDescription,
-    location: location || undefined,
-    date:     dateStr,
-    excludeItemIds:    Array.isArray(excludeItemIds) && excludeItemIds.length > 0 ? excludeItemIds : undefined,
-    aestheticEmphasis: aestheticEmphasis || undefined,
-  };
-  const req = new Request("http://internal/api/outfits/generate", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(body),
-  });
   try {
-    const res = await generateOutfitPOST(req);
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      console.error(`[daily-outfits] generate failed for slot=${slot}:`, errBody);
+    const result = await generateOutfit({
+      userId,
+      eventDescription,
+      location: location || undefined,
+      date:     dateStr,
+      excludeItemIds:    Array.isArray(excludeItemIds) && excludeItemIds.length > 0 ? excludeItemIds : undefined,
+      aestheticEmphasis: aestheticEmphasis || undefined,
+    });
+    if (!result.ok) {
+      console.error(`[daily-outfits] generate failed for slot=${slot}:`, result.error);
       return null;
     }
-    const data = await res.json();
-    return data?.id ? { outfitId: data.id } : null;
+    return result.id ? { outfitId: result.id } : null;
   } catch (err) {
     console.error(`[daily-outfits] generate threw for slot=${slot}:`, err);
     return null;

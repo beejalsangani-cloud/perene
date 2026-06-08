@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Perene",
+    "slug": "perene",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "perene",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "backgroundColor": "#F5F1E8",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.perene.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Perene uses your camera so you can photograph clothing to add to your closet.",
+        "NSPhotoLibraryUsageDescription": "Perene needs access to your photos so you can add existing clothing pictures to your closet.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.perene.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Perene needs access to your photos so you can add existing clothing pictures to your closet.",
+          "cameraPermission": "Perene uses your camera so you can photograph clothing to add to your closet."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2A3D2E",
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

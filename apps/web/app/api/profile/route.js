@@ -1,11 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth";
 
 export async function POST(request) {
-  const body = await request.json();
-  const { userId, answers } = body;
+  // User identity comes from the verified Bearer token, never the body.
+  const { userId, response } = await requireUser(request);
+  if (response) return response;
 
-  if (!userId) {
-    return Response.json({ error: "Missing userId" }, { status: 400 });
+  const body = await request.json();
+  const { answers } = body;
+
+  if (!answers) {
+    return Response.json({ error: "Missing answers" }, { status: 400 });
   }
 
   const payload = {

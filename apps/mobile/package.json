@@ -1,0 +1,47 @@
+{
+  "name": "@perene/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "lint": "expo lint",
+    "fix-deps": "expo install --fix"
+  },
+  "dependencies": {
+    "@expo-google-fonts/inter": "^0.2.3",
+    "@expo-google-fonts/playfair-display": "^0.2.3",
+    "@perene/shared": "*",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@supabase/supabase-js": "^2.104.1",
+    "@tanstack/react-query": "^5.62.0",
+    "expo": "~54.0.0",
+    "expo-camera": "~16.1.5",
+    "expo-constants": "~17.1.6",
+    "expo-font": "~13.3.1",
+    "expo-image": "~2.1.7",
+    "expo-image-manipulator": "~13.1.5",
+    "expo-image-picker": "~16.1.4",
+    "expo-linking": "~7.1.5",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "~14.2.3",
+    "expo-splash-screen": "~0.30.8",
+    "expo-status-bar": "~2.2.3",
+    "nativewind": "^4.1.23",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.1.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3"
+  }
+}

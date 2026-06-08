@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, authHeader } from "@/lib/supabase";
 import DashboardNav from "@/app/components/DashboardNav";
 
 const QUOTES = [
@@ -92,9 +92,8 @@ function NewOutfitContent() {
     try {
       const res = await fetch("/api/outfits/generate", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
-          userId: user.id,
           eventDescription,
           location:            location             || undefined,
           date:                date                 || undefined,

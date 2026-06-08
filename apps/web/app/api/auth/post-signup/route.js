@@ -3,6 +3,11 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 // Persists optional first_name + marketing_opt_in to user_profiles right after
 // signup. Uses the service-role client so it works even when email confirmation
 // is on (the user isn't authenticated yet, so RLS would block a direct insert).
+//
+// DELIBERATE EXCEPTION to the Bearer-token rule used by every other route: this
+// runs BEFORE the user has a session (email-confirmation flow), so there is no
+// access token to verify — it must trust the userId returned by signUp(). Keep
+// it minimal (name + opt-in only); never extend it to sensitive writes.
 export async function POST(request) {
   const { userId, firstName, marketingOptIn } = await request.json();
 

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -117,9 +118,13 @@ Return only the raw JSON object — no markdown, no explanation.`,
 // Never deletes the user's local photo on failure — every failure returns *something*
 // the client can save with.
 export async function POST(request) {
-  const { imageBase64, mediaType, userId } = await request.json();
+  // User identity comes from the verified Bearer token, never the body.
+  const { userId, response } = await requireUser(request);
+  if (response) return response;
 
-  if (!imageBase64 || !mediaType || !userId) {
+  const { imageBase64, mediaType } = await request.json();
+
+  if (!imageBase64 || !mediaType) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 

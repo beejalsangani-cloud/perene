@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { requireUser } from "@/lib/auth";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase  = createClient(
@@ -12,8 +13,9 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(request) {
   try {
-    const { userId } = await request.json();
-    if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+    // User identity comes from the verified Bearer token, never the body.
+    const { userId, response } = await requireUser(request);
+    if (response) return response;
 
     // Fetch profile
     const { data: profile } = await supabase

@@ -144,21 +144,32 @@ function buildSlotPayload(existing, shuffleLimit) {
 // ── GET ─────────────────────────────────────────────────────────────────────
 
 export async function GET(request) {
+  // [TIMING] temporary instrumentation — remove once slowness is diagnosed.
+  const TIMING_TAG = "[daily-outfits TIMING]";
+  const tStart = Date.now();
+  const ms = (from) => `${Date.now() - from}ms`;
+
+  let t = Date.now();
   const userId = await userIdFromAuthHeader(request);
+  console.log(`${TIMING_TAG} auth.getUser → ${ms(t)}`);
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const url     = new URL(request.url);
   const dateStr = url.searchParams.get("date") ?? todayUtc();
   const limit   = shuffleLimitForUser(userId);
+  console.log(`${TIMING_TAG} request → user=${userId} date=${dateStr}`);
 
   // Closet size — drives the < 5 items fallback on the client
+  t = Date.now();
   const { count: closetCount } = await supabaseAdmin
     .from("wardrobe_items")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId);
+  console.log(`${TIMING_TAG} wardrobe count → ${ms(t)} (count=${closetCount ?? 0})`);
 
   const closet = closetCount ?? 0;
   if (closet < CLOSET_MINIMUM_FOR_DAILY) {
+    console.log(`${TIMING_TAG} closet < minimum, short-circuit → total ${ms(tStart)}`);
     return Response.json({
       closet_count:    closet,
       closet_minimum:  CLOSET_MINIMUM_FOR_DAILY,
@@ -170,35 +181,45 @@ export async function GET(request) {
   }
 
   // Existing slots for this date
-  const { data: rows } = await supabaseAdmin
+  t = Date.now();
+  const { data: rows, error: selectErr } = await supabaseAdmin
     .from("daily_outfits")
     .select("*, outfit:outfits(*)")
     .eq("user_id", userId)
     .eq("generated_for_date", dateStr);
+  console.log(`${TIMING_TAG} daily_outfits select → ${ms(t)} (rows=${rows?.length ?? 0}${selectErr ? ` err=${selectErr.message}` : ""})`);
 
   const bySlot = Object.fromEntries((rows ?? []).map((r) => [r.slot, r]));
+  console.log(`${TIMING_TAG} cache state → daytime=${bySlot.daytime ? "HIT" : "MISS"} evening=${bySlot.evening ? "HIT" : "MISS"}`);
 
   // Generate any missing slots in parallel. Initial generation uses
   // aesthetic emphasis from the user's first style descriptor (attempt 0).
   const missing = ["daytime", "evening"].filter((s) => !bySlot[s]);
   if (missing.length > 0) {
+    console.log(`${TIMING_TAG} CACHE MISS — generating slots: ${missing.join(", ")}`);
+    t = Date.now();
     const [location, descriptors] = await Promise.all([
       getUserLocation(userId),
       getUserStyleDescriptors(userId),
     ]);
+    console.log(`${TIMING_TAG} location + descriptors fetch → ${ms(t)}`);
     const initialEmphasis = aestheticEmphasisFor({ style_descriptors: descriptors }, 0);
 
+    t = Date.now();
     const generated = await Promise.all(
       missing.map((slot) =>
         generateDailyOutfit({ userId, slot, dateStr, location, aestheticEmphasis: initialEmphasis })
       )
     );
+    console.log(`${TIMING_TAG} Claude generation (${missing.length} parallel) → ${ms(t)} (results=${generated.map((g) => g ? "ok" : "null").join(",")})`);
 
+    t = Date.now();
+    let insertedCount = 0;
     for (let i = 0; i < missing.length; i++) {
       const slot = missing[i];
       const gen  = generated[i];
       if (!gen) continue;
-      const { data: inserted } = await supabaseAdmin
+      const { data: inserted, error: insertErr } = await supabaseAdmin
         .from("daily_outfits")
         .insert({
           user_id:            userId,
@@ -209,10 +230,15 @@ export async function GET(request) {
         })
         .select("*, outfit:outfits(*)")
         .single();
-      if (inserted) bySlot[slot] = inserted;
+      if (insertErr) console.log(`${TIMING_TAG} daily_outfits insert FAILED for slot=${slot}: ${insertErr.code} ${insertErr.message}`);
+      if (inserted) { bySlot[slot] = inserted; insertedCount++; }
     }
+    console.log(`${TIMING_TAG} daily_outfits inserts (${missing.length} sequential) → ${ms(t)} (inserted=${insertedCount}/${missing.length})`);
+  } else {
+    console.log(`${TIMING_TAG} CACHE HIT — both slots, no generation`);
   }
 
+  console.log(`${TIMING_TAG} TOTAL → ${ms(tStart)}`);
   return Response.json({
     closet_count:   closet,
     closet_minimum: CLOSET_MINIMUM_FOR_DAILY,

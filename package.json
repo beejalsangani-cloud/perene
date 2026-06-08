@@ -1,33 +1,17 @@
 {
-  "name": "perene",
+  "name": "perene-monorepo",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "web": "npm run dev --workspace @perene/web",
+    "web:build": "npm run build --workspace @perene/web",
+    "mobile": "npm run start --workspace @perene/mobile"
   },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
-    "@fontsource/inter": "^5.2.8",
-    "@fontsource/playfair-display": "^5.2.8",
-    "@mailchimp/mailchimp_marketing": "^3.0.80",
-    "@supabase/supabase-js": "^2.104.1",
-    "@vercel/analytics": "^2.0.1",
-    "browser-image-compression": "^2.0.2",
-    "next": "16.2.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+  "engines": {
+    "node": ">=20"
   }
 }

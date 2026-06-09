@@ -17,7 +17,7 @@ export interface StyleProfile {
   typical_events?: string[];
   budget_range?: string | null;
   color_preferences?: string[];
-  default_location?: { city?: string; [k: string]: unknown } | null;
+  default_location?: DefaultLocation | null;
   marketing_opt_in?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -36,6 +36,29 @@ export interface WardrobeItem {
   notes: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+// ── location (user_profiles.default_location) ────────────────────────────────
+export interface DefaultLocation {
+  city: string;
+  lat?: number;
+  lng?: number;
+}
+
+// ── live weather (the /api/weather GET response) ─────────────────────────────
+// Distinct from the stored snapshot below: includes a current temperature and
+// resolved display city.
+export interface WeatherNow {
+  city: string;
+  latitude: number;
+  longitude: number;
+  date: string;
+  temperature_current: number | null;
+  temperature_high: number;
+  temperature_low: number;
+  precipitation_chance: number;
+  weather_code: number;
+  condition: string;
 }
 
 // ── weather snapshot (stored on outfits.weather) ─────────────────────────────

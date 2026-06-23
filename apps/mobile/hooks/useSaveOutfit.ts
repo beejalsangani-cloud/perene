@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "~/lib/api";
 import type { DailyOutfitsData } from "~/hooks/useDailyOutfits";
 import type { OutfitDetail } from "~/hooks/useOutfit";
+import type { SavedOutfit } from "~/hooks/useSavedOutfits";
 
 interface SaveVars {
   outfitId: string;
@@ -26,6 +27,7 @@ export function useSaveOutfit() {
     onMutate: async ({ outfitId, saved }: SaveVars) => {
       await queryClient.cancelQueries({ queryKey: ["outfit", outfitId] });
       await queryClient.cancelQueries({ queryKey: ["daily-outfits"] });
+      await queryClient.cancelQueries({ queryKey: ["saved-outfits"] });
 
       const prevDetail = queryClient.getQueryData<OutfitDetail | null>([
         "outfit",
@@ -33,6 +35,9 @@ export function useSaveOutfit() {
       ]);
       const prevDaily = queryClient.getQueriesData<DailyOutfitsData>({
         queryKey: ["daily-outfits"],
+      });
+      const prevSaved = queryClient.getQueriesData<SavedOutfit[]>({
+        queryKey: ["saved-outfits"],
       });
 
       // Patch the detail cache
@@ -67,7 +72,16 @@ export function useSaveOutfit() {
         }
       );
 
-      return { prevDetail, prevDaily };
+      // Patch the saved-outfits list: drop the outfit when unsaving. (Re-saving
+      // from elsewhere is reconciled by the list's own refetch on focus.)
+      if (!saved) {
+        queryClient.setQueriesData<SavedOutfit[]>(
+          { queryKey: ["saved-outfits"] },
+          (list) => list?.filter((s) => s.outfit.id !== outfitId)
+        );
+      }
+
+      return { prevDetail, prevDaily, prevSaved };
     },
 
     onError: (_err, { outfitId }, context) => {
@@ -75,6 +89,9 @@ export function useSaveOutfit() {
         queryClient.setQueryData(["outfit", outfitId], context.prevDetail);
       }
       for (const [key, data] of context?.prevDaily ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      for (const [key, data] of context?.prevSaved ?? []) {
         queryClient.setQueryData(key, data);
       }
     },

@@ -54,6 +54,7 @@ function RootNavigator() {
         options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen name="confirm-item" options={{ presentation: "modal" }} />
+      <Stack.Screen name="outfits/[id]" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }

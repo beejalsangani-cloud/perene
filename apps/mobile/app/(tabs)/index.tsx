@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import { CLOSET_MINIMUM_FOR_DAILY, type StyleProfile } from "@perene/shared";
 import { useAuth } from "~/context/AuthContext";
 import { useProfile } from "~/hooks/useProfile";
@@ -17,6 +16,8 @@ import { WeatherWidget } from "~/components/WeatherWidget";
 import { LocationSetup } from "~/components/LocationSetup";
 import { ProfileCard } from "~/components/ProfileCard";
 import { ClosetPreview } from "~/components/ClosetPreview";
+import { TodaysSuggestions } from "~/components/TodaysSuggestions";
+import { useDailyOutfits } from "~/hooks/useDailyOutfits";
 
 function firstNameFrom(
   profile: StyleProfile | null | undefined,
@@ -34,20 +35,24 @@ function firstNameFrom(
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
   const { user, signOut } = useAuth();
   const profileQuery = useProfile();
   const closetQuery = useCloset();
+  const dailyQuery = useDailyOutfits();
 
   const profile = profileQuery.data;
   const closet = closetQuery.data;
   const name = firstNameFrom(profile, user?.email, user?.user_metadata);
 
-  const refreshing = profileQuery.isRefetching || closetQuery.isRefetching;
+  const refreshing =
+    profileQuery.isRefetching ||
+    closetQuery.isRefetching ||
+    dailyQuery.isRefetching;
   const onRefresh = useCallback(() => {
     profileQuery.refetch();
     closetQuery.refetch();
-  }, [profileQuery, closetQuery]);
+    dailyQuery.refetch();
+  }, [profileQuery, closetQuery, dailyQuery]);
 
   const profileLoading = profileQuery.isLoading;
   const closetCount = closet?.count ?? null;
@@ -104,22 +109,8 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Today's Suggestions — wired in Phase 3 */}
-        <View className="rounded-2xl border border-forest/10 bg-white p-6">
-          <Text className="font-display text-lg text-forest">
-            Today&apos;s Suggestions
-          </Text>
-          <Text className="mt-2 text-sm font-sans text-forest/55">
-            {closetCount !== null && closetCount >= CLOSET_MINIMUM_FOR_DAILY
-              ? "Your daytime and evening looks will appear here."
-              : `Add at least ${CLOSET_MINIMUM_FOR_DAILY} pieces and Perene will style a daytime and an evening look each morning.`}
-          </Text>
-          <View className="mt-4 self-start rounded-full bg-forest/6 px-4 py-2">
-            <Text className="text-xs font-sans-semibold text-forest/40">
-              Phase 3 — coming soon
-            </Text>
-          </View>
-        </View>
+        {/* Today's Suggestions — Daytime + Evening daily looks */}
+        <TodaysSuggestions />
 
         {/* Closet preview */}
         <ClosetPreview summary={closet} loading={closetQuery.isLoading} />

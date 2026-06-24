@@ -21,6 +21,7 @@ module.exports = {
         // Names must match the font keys loaded via useFonts in app/_layout.tsx
         display: ["PlayfairDisplay_700Bold"],
         "display-regular": ["PlayfairDisplay_400Regular"],
+        "display-italic": ["PlayfairDisplay_400Regular_Italic"],
         sans: ["Inter_400Regular"],
         "sans-medium": ["Inter_500Medium"],
         "sans-semibold": ["Inter_600SemiBold"],

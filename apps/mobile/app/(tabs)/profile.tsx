@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PALETTE_SWATCHES, type StyleProfile } from "@perene/shared";
 import { useAuth } from "~/context/AuthContext";
 import { useProfile } from "~/hooks/useProfile";
 import { useUpdateProfile, type ProfileAnswers } from "~/hooks/useUpdateProfile";
+import { useCustomerInfo } from "~/hooks/useCustomerInfo";
+import { useRestorePurchases } from "~/hooks/useRestorePurchases";
+import { ENTITLEMENT_ID, hasActiveEntitlement } from "~/lib/revenuecat";
 
 // ── Field config — ported from the web quiz STEPS (apps/web/app/quiz/page.js).
 // Order leads with the brand-prominent fields (style, occasions, palette).
@@ -177,6 +181,96 @@ function Section({
   );
 }
 
+// ── Membership ───────────────────────────────────────────────────────────────
+function MembershipSection() {
+  const router = useRouter();
+  const { customerInfo, isSubscribed } = useCustomerInfo();
+  const restore = useRestorePurchases();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const entitlement = customerInfo?.entitlements.active[ENTITLEMENT_ID];
+  const renews = entitlement?.expirationDate
+    ? new Date(entitlement.expirationDate).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  function handleRestore() {
+    if (restore.isPending) return;
+    setNotice(null);
+    restore.mutate(undefined, {
+      onSuccess: (info) =>
+        setNotice(
+          hasActiveEntitlement(info)
+            ? "Membership restored."
+            : "No active subscription found to restore."
+        ),
+      onError: () => setNotice("Couldn't restore purchases. Please try again."),
+    });
+  }
+
+  return (
+    <View className="gap-3">
+      <Text className="text-[11px] font-sans-semibold uppercase tracking-widest text-forest/45">
+        Membership
+      </Text>
+
+      <View className="gap-3 rounded-2xl border border-forest/12 bg-white p-4">
+        <View className="flex-row items-center gap-3">
+          <Ionicons
+            name={isSubscribed ? "checkmark-circle" : "sparkles-outline"}
+            size={22}
+            color={isSubscribed ? "#2A3D2E" : "#C9A87C"}
+          />
+          <View className="flex-1">
+            <Text className="text-sm font-sans-bold text-forest">
+              {isSubscribed ? "Perene membership active" : "No active membership"}
+            </Text>
+            <Text className="mt-0.5 text-xs font-sans text-forest/55">
+              {isSubscribed
+                ? renews
+                  ? entitlement?.willRenew
+                    ? `Renews ${renews}`
+                    : `Access until ${renews}`
+                  : "Active"
+                : "Unlock daily suggestions and more."}
+            </Text>
+          </View>
+        </View>
+
+        {!isSubscribed ? (
+          <Pressable
+            onPress={() => router.push("/paywall")}
+            className="items-center rounded-xl bg-lime py-3 active:opacity-80"
+          >
+            <Text className="text-sm font-sans-bold text-forest">View plans</Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={handleRestore}
+          disabled={restore.isPending}
+          className="flex-row items-center justify-center gap-2 rounded-xl border border-forest/15 py-3 active:opacity-70"
+        >
+          {restore.isPending ? (
+            <ActivityIndicator color="#2A3D2E" size="small" />
+          ) : (
+            <Text className="text-sm font-sans-semibold text-forest/70">
+              Restore Purchases
+            </Text>
+          )}
+        </Pressable>
+
+        {notice ? (
+          <Text className="text-xs font-sans-medium text-forest/60">{notice}</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const { signOut } = useAuth();
@@ -260,6 +354,8 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ) : null}
+
+        <MembershipSection />
 
         {/* Sign out */}
         <Pressable

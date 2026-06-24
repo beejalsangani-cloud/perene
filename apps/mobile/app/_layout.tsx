@@ -1,5 +1,5 @@
 import "../global.css";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as SplashScreen from "expo-splash-screen";
@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import {
   useFonts,
   PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
   PlayfairDisplay_700Bold,
 } from "@expo-google-fonts/playfair-display";
 import {
@@ -18,6 +19,8 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import { AuthProvider, useAuth } from "~/context/AuthContext";
+import { SubscriptionProvider } from "~/context/SubscriptionProvider";
+import { useCustomerInfo } from "~/hooks/useCustomerInfo";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,8 +35,11 @@ const queryClient = new QueryClient({
 // persisted session (initializing === false).
 function RootNavigator() {
   const { session, initializing } = useAuth();
+  const { customerInfo, isSubscribed } = useCustomerInfo();
   const segments = useSegments();
   const router = useRouter();
+  // Present the paywall at most once per launch so dismissing it sticks.
+  const paywallShown = useRef(false);
 
   useEffect(() => {
     if (initializing) return;
@@ -45,6 +51,20 @@ function RootNavigator() {
     }
   }, [session, initializing, segments, router]);
 
+  // First-launch paywall gate. Only fires once we have a definitive
+  // subscription status (customerInfo loaded) and the user isn't subscribed.
+  // Dismissible — no features are gated in this phase.
+  useEffect(() => {
+    if (initializing || !session) return;
+    if (paywallShown.current || segments[0] === "(auth)" || segments[0] === "paywall") {
+      return;
+    }
+    if (customerInfo && !isSubscribed) {
+      paywallShown.current = true;
+      router.push("/paywall");
+    }
+  }, [initializing, session, customerInfo, isSubscribed, segments, router]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
@@ -55,6 +75,10 @@ function RootNavigator() {
       />
       <Stack.Screen name="confirm-item" options={{ presentation: "modal" }} />
       <Stack.Screen name="outfits/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen
+        name="paywall"
+        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }
@@ -62,6 +86,7 @@ function RootNavigator() {
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     PlayfairDisplay_400Regular,
+    PlayfairDisplay_400Regular_Italic,
     PlayfairDisplay_700Bold,
     Inter_400Regular,
     Inter_500Medium,
@@ -80,8 +105,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
+            <SubscriptionProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </SubscriptionProvider>
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -12,6 +12,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { setPendingCapture } from "~/lib/pendingCapture";
+import { impact } from "~/lib/haptics";
 
 // The hero capture screen. Reached from the lime "+" FAB. Camera permission is
 // requested here (only once the user has chosen to add a piece), with a brand
@@ -33,6 +34,7 @@ export default function CameraScreen() {
   async function takePhoto() {
     if (!cameraRef.current || busy) return;
     setBusy(true);
+    impact(); // shutter thunk
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (photo?.uri) goToConfirm(photo.uri, photo.width);

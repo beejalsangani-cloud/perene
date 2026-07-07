@@ -1,6 +1,7 @@
 import { Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSaveOutfit } from "~/hooks/useSaveOutfit";
+import { success, tap } from "~/lib/haptics";
 
 // Floating heart save toggle for the magazine-cover cards — the native port of
 // the web SaveButton variant="icon". `saved` is read from the cached outfit
@@ -20,6 +21,7 @@ export function SaveHeart({
     <Pressable
       onPress={() => {
         if (save.isPending) return;
+        (saved ? tap : success)();
         save.mutate({ outfitId, saved: !saved });
       }}
       disabled={save.isPending}

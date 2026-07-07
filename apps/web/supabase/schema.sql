@@ -291,3 +291,48 @@ create policy "users: update own push subscriptions"
 create policy "users: delete own push subscriptions"
   on public.push_subscriptions for delete
   using (auth.uid() = user_id);
+
+-- ── 2026-07-07: native device push tokens (Expo / APNs — send-side foundation) ─
+-- The mobile app (Expo) registers for push and obtains an *Expo push token*
+-- (ExponentPushToken[…]), which is a different shape from the Web Push
+-- subscription above (endpoint/p256dh/auth). We store it separately here rather
+-- than overloading push_subscriptions. One row per device; token is UNIQUE so a
+-- re-registration from the same device upserts (onConflict 'token', see
+-- /api/push/device-token) and re-points the row at the current user. platform
+-- distinguishes ios/android for future per-platform sending. We are NOT sending
+-- notifications yet — trigger logic comes later. RLS mirrors push_subscriptions:
+-- a user only sees/writes their own rows; the service role bypasses RLS.
+create table if not exists public.device_push_tokens (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  token       text not null unique,
+  platform    text check (platform in ('ios', 'android')),
+  device_name text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create index if not exists device_push_tokens_user_id_idx
+  on public.device_push_tokens(user_id);
+
+create or replace trigger device_push_tokens_updated_at
+  before update on public.device_push_tokens
+  for each row execute procedure public.set_updated_at();
+
+alter table public.device_push_tokens enable row level security;
+
+create policy "users: read own device push tokens"
+  on public.device_push_tokens for select
+  using (auth.uid() = user_id);
+
+create policy "users: insert own device push tokens"
+  on public.device_push_tokens for insert
+  with check (auth.uid() = user_id);
+
+create policy "users: update own device push tokens"
+  on public.device_push_tokens for update
+  using (auth.uid() = user_id);
+
+create policy "users: delete own device push tokens"
+  on public.device_push_tokens for delete
+  using (auth.uid() = user_id);

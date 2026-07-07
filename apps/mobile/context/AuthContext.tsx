@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "~/lib/supabase";
+import { unregisterPushToken } from "~/lib/push";
 
 interface AuthContextValue {
   session: Session | null;
@@ -49,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       initializing,
       signOut: async () => {
+        // Detach this device's push token first (best-effort — needs the still-
+        // valid session to authenticate the delete), then end the session.
+        await unregisterPushToken();
         await supabase.auth.signOut();
       },
     }),

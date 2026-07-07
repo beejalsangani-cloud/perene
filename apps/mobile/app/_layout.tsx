@@ -21,6 +21,7 @@ import {
 import { AuthProvider, useAuth } from "~/context/AuthContext";
 import { SubscriptionProvider } from "~/context/SubscriptionProvider";
 import { useCustomerInfo } from "~/hooks/useCustomerInfo";
+import { usePushRegistration } from "~/hooks/usePushRegistration";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,9 @@ function RootNavigator() {
   const router = useRouter();
   // Present the paywall at most once per launch so dismissing it sticks.
   const paywallShown = useRef(false);
+
+  // Register for push once signed in (best-effort, no-op on simulator/denied).
+  usePushRegistration();
 
   useEffect(() => {
     if (initializing) return;

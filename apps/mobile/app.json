@@ -8,6 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "backgroundColor": "#F5F1E8",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.perene.app",
@@ -19,7 +20,11 @@
     },
     "android": {
       "package": "com.perene.app",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2A3D2E"
+      }
     },
     "plugins": [
       "expo-router",
@@ -34,8 +39,16 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash.png",
+          "imageWidth": 220,
           "backgroundColor": "#2A3D2E",
           "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2A3D2E"
         }
       ],
       "expo-font"

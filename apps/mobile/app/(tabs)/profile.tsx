@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +9,9 @@ import { useProfile } from "~/hooks/useProfile";
 import { useUpdateProfile, type ProfileAnswers } from "~/hooks/useUpdateProfile";
 import { useCustomerInfo } from "~/hooks/useCustomerInfo";
 import { useRestorePurchases } from "~/hooks/useRestorePurchases";
+import { useDeleteAccount } from "~/hooks/useDeleteAccount";
 import { ENTITLEMENT_ID, hasActiveEntitlement } from "~/lib/revenuecat";
+import { success, warning } from "~/lib/haptics";
 
 // ── Field config — ported from the web quiz STEPS (apps/web/app/quiz/page.js).
 // Order leads with the brand-prominent fields (style, occasions, palette).
@@ -271,6 +273,96 @@ function MembershipSection() {
   );
 }
 
+// ── Delete account ───────────────────────────────────────────────────────────
+// Apple requires an in-app path to permanently delete the account. A two-tap
+// confirmation modal spells out exactly what's removed; the mutation deletes
+// server-side then signs out, which flips the app back to the auth stack.
+function DeleteAccountSection() {
+  const [open, setOpen] = useState(false);
+  const del = useDeleteAccount();
+
+  function confirmDelete() {
+    if (del.isPending) return;
+    warning();
+    del.mutate(undefined, {
+      // On success the session is cleared and the auth gate navigates away, so
+      // there's nothing to do here. The modal unmounts with the screen.
+      onError: () => {
+        /* error surfaces inline in the modal via del.isError */
+      },
+    });
+  }
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        className="flex-row items-center justify-center gap-2 py-2 active:opacity-60"
+      >
+        <Ionicons name="trash-outline" size={14} color="rgba(42,61,46,0.45)" />
+        <Text className="text-xs font-sans-semibold text-forest/45">Delete account</Text>
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !del.isPending && setOpen(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/50 px-8">
+          <View className="w-full gap-4 rounded-3xl bg-cream p-6">
+            <View className="items-center gap-3">
+              <View className="h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <Ionicons name="warning" size={24} color="#B91C1C" />
+              </View>
+              <Text className="text-center font-display text-2xl text-forest">
+                Delete your account?
+              </Text>
+              <Text className="text-center text-sm font-sans text-forest/60">
+                This permanently deletes your profile, closet items, saved looks,
+                and outfit history. This cannot be undone.
+              </Text>
+            </View>
+
+            {del.isError ? (
+              <View className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <Text className="text-center text-xs font-sans-medium text-red-700">
+                  Couldn&apos;t delete your account — please try again.
+                </Text>
+              </View>
+            ) : null}
+
+            <View className="gap-2">
+              <Pressable
+                onPress={confirmDelete}
+                disabled={del.isPending}
+                className={`flex-row items-center justify-center gap-2 rounded-xl py-3.5 ${
+                  del.isPending ? "bg-red-300" : "bg-red-600 active:opacity-80"
+                }`}
+              >
+                {del.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text className="text-sm font-sans-bold text-white">
+                    Delete account permanently
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={() => setOpen(false)}
+                disabled={del.isPending}
+                className="items-center rounded-xl border border-forest/15 py-3.5 active:opacity-70"
+              >
+                <Text className="text-sm font-sans-semibold text-forest/70">Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const { signOut } = useAuth();
@@ -312,6 +404,7 @@ export default function ProfileScreen() {
   function handleSave() {
     update.mutate(draft, {
       onSuccess: () => {
+        success();
         setJustSaved(true);
         setTimeout(() => setJustSaved(false), 2500);
       },
@@ -365,6 +458,8 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={16} color="rgba(42,61,46,0.65)" />
           <Text className="text-sm font-sans-semibold text-forest/65">Sign out</Text>
         </Pressable>
+
+        <DeleteAccountSection />
       </ScrollView>
 
       {/* Sticky save bar — appears when there are unsaved changes */}

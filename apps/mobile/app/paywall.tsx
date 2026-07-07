@@ -15,6 +15,7 @@ import { hasActiveEntitlement } from "~/lib/revenuecat";
 import { useOfferings } from "~/hooks/useOfferings";
 import { usePurchasePackage, PURCHASE_CANCELLED } from "~/hooks/usePurchasePackage";
 import { useRestorePurchases } from "~/hooks/useRestorePurchases";
+import { error as hapticError, success, tap } from "~/lib/haptics";
 
 // Placeholder legal URLs — swap for the real hosted pages before App Store
 // submission (Apple requires functional Terms of Use + Privacy Policy links).
@@ -64,10 +65,15 @@ export default function Paywall() {
     setNotice(null);
     purchase.mutate(selectedPkg, {
       onSuccess: (result) => {
-        if (result !== PURCHASE_CANCELLED) router.back();
+        if (result !== PURCHASE_CANCELLED) {
+          success();
+          router.back();
+        }
       },
-      onError: () =>
-        setNotice("Something went wrong with your purchase. Please try again."),
+      onError: () => {
+        hapticError();
+        setNotice("Something went wrong with your purchase. Please try again.");
+      },
     });
   }
 
@@ -76,8 +82,10 @@ export default function Paywall() {
     setNotice(null);
     restore.mutate(undefined, {
       onSuccess: (info) => {
-        if (hasActiveEntitlement(info)) router.back();
-        else setNotice("No active subscription found to restore.");
+        if (hasActiveEntitlement(info)) {
+          success();
+          router.back();
+        } else setNotice("No active subscription found to restore.");
       },
       onError: () => setNotice("Couldn't restore purchases. Please try again."),
     });
@@ -151,7 +159,10 @@ export default function Paywall() {
                 subtitle={hasTrial ? "7 days free, then billed monthly" : "Billed monthly"}
                 badge={hasTrial ? "7-DAY FREE TRIAL" : undefined}
                 selected={selected === "monthly"}
-                onPress={() => setSelected("monthly")}
+                onPress={() => {
+                  tap();
+                  setSelected("monthly");
+                }}
               />
             ) : null}
             {annual ? (
@@ -166,7 +177,10 @@ export default function Paywall() {
                 }
                 badge={savingsPct && savingsPct > 0 ? `SAVE ${savingsPct}%` : undefined}
                 selected={selected === "annual"}
-                onPress={() => setSelected("annual")}
+                onPress={() => {
+                  tap();
+                  setSelected("annual");
+                }}
               />
             ) : null}
           </View>

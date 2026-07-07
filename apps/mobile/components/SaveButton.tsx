@@ -1,6 +1,7 @@
 import { Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSaveOutfit } from "~/hooks/useSaveOutfit";
+import { success, tap } from "~/lib/haptics";
 
 // Pill save button for the outfit detail footer — native port of the web
 // SaveButton variant="button". Controlled by the cached outfit's is_saved
@@ -19,6 +20,7 @@ export function SaveButton({
     <Pressable
       onPress={() => {
         if (save.isPending) return;
+        (saved ? tap : success)();
         save.mutate({ outfitId, saved: !saved });
       }}
       disabled={save.isPending}

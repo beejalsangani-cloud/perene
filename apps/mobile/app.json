@@ -24,7 +24,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2A3D2E"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -60,8 +63,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "0ab62db8-0021-4d82-9a74-8010a65f0843"
       }
-    }
+    },
+    "owner": "beejal.sangani"
   }
 }

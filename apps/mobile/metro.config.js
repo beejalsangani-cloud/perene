@@ -21,15 +21,46 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, "node_modules"),
 ];
 
-// The web app pins a newer React (Next.js) than Expo SDK 54, so npm keeps both:
-// the app's copy nested here and the web's hoisted at the root. Force every
-// react / react-native import in the native bundle to resolve to THIS app's
-// copy — otherwise a root-hoisted package could pull the web's React and cause
-// "Invalid hook call" / duplicate-renderer crashes.
-config.resolver.extraNodeModules = {
-  ...config.resolver.extraNodeModules,
-  react: path.resolve(projectRoot, "node_modules/react"),
-  "react-native": path.resolve(projectRoot, "node_modules/react-native"),
+// Force every `react` import in the native bundle to resolve to THIS app's
+// nested copy (19.1.0). npm hoists a newer React to the root node_modules
+// (pulled transitively by the web app's ^19 deps — react-dom, radix, etc.), and
+// react-native itself is hoisted there too, so RN 0.81's bundled renderer's
+// `require("react")` would otherwise resolve to the root 19.2.x instead of the
+// 19.1.0 it's built against → "Invalid hook call".
+//
+// This MUST be a resolveRequest override, not extraNodeModules: Metro consults
+// extraNodeModules only as a fallback when normal resolution fails, and normal
+// resolution *succeeds* at the hoisted root — so the mapping never fires. A
+// resolveRequest intercepts the request first and is the only way to guarantee a
+// single copy.
+//
+// Pin ONLY react — not react-native. resolveRequest is global, so this rule
+// already rewrites the `require("react")` *inside* the root react-native, which
+// is all we need to unify the renderer. react-native has a single hoisted copy
+// with no app-local counterpart, so pinning it would rewrite `react-native/…`
+// (including RN internals like Libraries/Core/InitializeCore) to a nonexistent
+// apps/mobile/node_modules/react-native and break resolution. Leave it to
+// normal resolution, which finds the root copy.
+const REACT = "react";
+const reactDir = path.resolve(projectRoot, "node_modules/react");
+
+const defaultResolveRequest = config.resolver.resolveRequest;
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Match "react" exactly and its subpaths ("react/jsx-runtime", "react/…"),
+  // but NOT unrelated packages that merely start with the name
+  // ("react-native", "react-native-screens", "react-dom").
+  if (moduleName === REACT || moduleName.startsWith(`${REACT}/`)) {
+    const subpath = moduleName.slice(REACT.length); // "" or "/jsx-runtime"
+    return context.resolveRequest(
+      context,
+      subpath ? `${reactDir}${subpath}` : reactDir,
+      platform
+    );
+  }
+  return defaultResolveRequest
+    ? defaultResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = withNativeWind(config, { input: "./global.css" });

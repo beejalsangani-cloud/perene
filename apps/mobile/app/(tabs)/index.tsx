@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { CLOSET_MINIMUM_FOR_DAILY, type StyleProfile } from "@perene/shared";
 import { useAuth } from "~/context/AuthContext";
 import { useProfile } from "~/hooks/useProfile";
@@ -35,6 +36,7 @@ function firstNameFrom(
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const profileQuery = useProfile();
   const closetQuery = useCloset();
@@ -84,6 +86,22 @@ export default function HomeScreen() {
             Here&apos;s your style at a glance.
           </Text>
         </View>
+
+        {/* Generate my outfit CTA */}
+        <Pressable
+          onPress={() => router.push("/outfits/new")}
+          className="flex-row items-center justify-between rounded-2xl bg-forest px-6 py-5 active:opacity-90"
+        >
+          <View className="flex-1 pr-3">
+            <Text className="font-display text-xl text-cream">
+              What are you dressing for?
+            </Text>
+            <Text className="mt-1 text-sm font-sans text-cream/65">
+              Describe an occasion, get a full outfit.
+            </Text>
+          </View>
+          <Text className="text-2xl text-lime">✦</Text>
+        </Pressable>
 
         {/* Weather / location setup */}
         {!profileLoading &&

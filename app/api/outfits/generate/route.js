@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { RETAILER_PROMPT_LINES, findRetailer } from "@/lib/affiliate";
 
@@ -143,8 +144,11 @@ function formatDateForPrompt(dateStr) {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request) {
+  const auth = await requireUser(request);
+  if (auth.response) return auth.response;
+  const { userId } = auth;
+
   const {
-    userId,
     eventDescription,
     location,
     date,
@@ -153,7 +157,7 @@ export async function POST(request) {
     aestheticEmphasis,
   } = await request.json();
 
-  if (!userId || !eventDescription?.trim()) {
+  if (!eventDescription?.trim()) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 

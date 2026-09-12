@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import imageCompression from "browser-image-compression";
-import { supabase } from "@/lib/supabase";
+import { supabase, authHeader } from "@/lib/supabase";
 
 export const CATEGORIES = ["Top", "Bottom", "Dress", "Outerwear", "Shoes", "Accessory", "Bag", "Other"];
 export const SEASONS    = ["Spring", "Summer", "Fall", "Winter", "All-season"];
@@ -128,11 +128,10 @@ export default function UploadModal({ isOpen, onClose, onSaved, user, editItem =
     try {
       res = await fetch("/api/wardrobe/process", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           imageBase64: base64,
           mediaType:   compressed.type || "image/jpeg",
-          userId:      user.id,
         }),
       });
     } catch (err) {

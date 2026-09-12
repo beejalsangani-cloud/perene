@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, authHeader } from "@/lib/supabase";
 import Wordmark from "@/app/components/Wordmark";
 
 // ── Step definitions ──────────────────────────────────────────────────────────
@@ -179,8 +179,8 @@ export default function QuizPage() {
 
     const res = await fetch("/api/profile", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, answers }),
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ answers }),
     });
 
     const data = await res.json();

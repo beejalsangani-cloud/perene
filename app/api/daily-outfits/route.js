@@ -68,10 +68,9 @@ function aestheticEmphasisFor(profile, attemptIndex) {
 // handler directly (no HTTP round-trip). Accepts optional shuffle-variety
 // hints — excludeItemIds (don't re-use these) and aestheticEmphasis (which
 // style tag to lean into). Returns { outfitId } or null.
-async function generateDailyOutfit({ userId, slot, dateStr, location, excludeItemIds, aestheticEmphasis }) {
+async function generateDailyOutfit({ userId, slot, dateStr, location, excludeItemIds, aestheticEmphasis, authHeaderValue }) {
   const eventDescription = eventDescriptionForSlot(slot, dateStr);
   const body = {
-    userId,
     eventDescription,
     location: location || undefined,
     date:     dateStr,
@@ -80,7 +79,7 @@ async function generateDailyOutfit({ userId, slot, dateStr, location, excludeIte
   };
   const req = new Request("http://internal/api/outfits/generate", {
     method:  "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: authHeaderValue },
     body:    JSON.stringify(body),
   });
   try {
@@ -146,6 +145,7 @@ function buildSlotPayload(existing, shuffleLimit) {
 export async function GET(request) {
   const userId = await userIdFromAuthHeader(request);
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const authHeaderValue = request.headers.get("authorization") ?? "";
 
   const url     = new URL(request.url);
   const dateStr = url.searchParams.get("date") ?? todayUtc();
@@ -190,7 +190,7 @@ export async function GET(request) {
 
     const generated = await Promise.all(
       missing.map((slot) =>
-        generateDailyOutfit({ userId, slot, dateStr, location, aestheticEmphasis: initialEmphasis })
+        generateDailyOutfit({ userId, slot, dateStr, location, aestheticEmphasis: initialEmphasis, authHeaderValue })
       )
     );
 
@@ -280,6 +280,7 @@ export async function POST(request) {
     location,
     excludeItemIds:    previousItemIds,
     aestheticEmphasis: emphasis,
+    authHeaderValue:   request.headers.get("authorization") ?? "",
   });
   if (!gen) {
     return Response.json({ error: "Generation failed" }, { status: 500 });

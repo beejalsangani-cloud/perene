@@ -1,12 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth";
 
 export async function POST(request) {
-  const body = await request.json();
-  const { userId, answers } = body;
+  const auth = await requireUser(request);
+  if (auth.response) return auth.response;
+  const { userId } = auth;
 
-  if (!userId) {
-    return Response.json({ error: "Missing userId" }, { status: 400 });
-  }
+  const body = await request.json();
+  const { answers } = body;
 
   const payload = {
     user_id: userId,

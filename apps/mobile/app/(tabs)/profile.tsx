@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -273,6 +273,40 @@ function MembershipSection() {
   );
 }
 
+// ── Help & legal ─────────────────────────────────────────────────────────────
+// Links out to the live pages on myperene.com so users (and App Review) can
+// reach support, the privacy policy, and the terms from inside the app.
+const HELP_LINKS = [
+  { label: "Help & Support", icon: "help-circle-outline", url: "https://myperene.com/support" },
+  { label: "Privacy Policy", icon: "shield-checkmark-outline", url: "https://myperene.com/privacy" },
+  { label: "Terms of Service", icon: "document-text-outline", url: "https://myperene.com/terms" },
+] as const;
+
+function HelpSection() {
+  return (
+    <View className="gap-3">
+      <Text className="text-[11px] font-sans-semibold uppercase tracking-widest text-forest/45">
+        Help &amp; legal
+      </Text>
+      <View className="rounded-2xl border border-forest/12 bg-white">
+        {HELP_LINKS.map((link, i) => (
+          <Pressable
+            key={link.url}
+            onPress={() => Linking.openURL(link.url)}
+            className={`flex-row items-center gap-3 px-4 py-3.5 active:opacity-60 ${
+              i > 0 ? "border-t border-forest/8" : ""
+            }`}
+          >
+            <Ionicons name={link.icon} size={18} color="rgba(42,61,46,0.65)" />
+            <Text className="flex-1 text-sm font-sans-semibold text-forest">{link.label}</Text>
+            <Ionicons name="open-outline" size={14} color="rgba(42,61,46,0.35)" />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ── Delete account ───────────────────────────────────────────────────────────
 // Apple requires an in-app path to permanently delete the account. A two-tap
 // confirmation modal spells out exactly what's removed; the mutation deletes
@@ -449,6 +483,8 @@ export default function ProfileScreen() {
         ) : null}
 
         <MembershipSection />
+
+        <HelpSection />
 
         {/* Sign out */}
         <Pressable

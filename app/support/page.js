@@ -38,7 +38,7 @@ export default function SupportPage() {
   return (
     <LegalPage title="Support">
       <p className="text-base">
-        We&rsquo;re here to help. Email us at <Mail address={SUPPORT_EMAIL} /> and we&rsquo;ll get
+        We&rsquo;re here to help. Email us at <Mail address={SUPPORT_EMAIL} />{" "}and we&rsquo;ll get
         back to you within 2 business days. Including the email address on your Perene account
         helps us find your details faster.
       </p>

@@ -1,5 +1,6 @@
 import Navbar from "./components/Navbar";
 import Wordmark from "./components/Wordmark";
+import Link from "next/link";
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
 function Hero() {
@@ -259,8 +260,9 @@ function Footer() {
           className="flex items-center gap-6 text-sm text-[#F5F1E8]/40"
           style={{ fontFamily: "var(--font-inter)" }}
         >
-          <span>Privacy</span>
-          <span>Terms</span>
+          <Link href="/privacy" className="hover:text-[#F5F1E8]">Privacy</Link>
+          <Link href="/terms" className="hover:text-[#F5F1E8]">Terms</Link>
+          <Link href="/support" className="hover:text-[#F5F1E8]">Support</Link>
         </div>
       </div>
     </footer>

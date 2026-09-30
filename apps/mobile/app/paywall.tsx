@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import type { PurchasesPackage } from "react-native-purchases";
+import { PURCHASES_ERROR_CODE, type PurchasesPackage } from "react-native-purchases";
 import { hasActiveEntitlement } from "~/lib/revenuecat";
 import { useOfferings } from "~/hooks/useOfferings";
 import { usePurchasePackage, PURCHASE_CANCELLED } from "~/hooks/usePurchasePackage";
@@ -39,6 +39,27 @@ const BENEFITS = [
 ] as const;
 
 type PlanId = "monthly" | "annual";
+
+// Turn a RevenueCat/StoreKit error into something the user can act on, with the
+// error code appended so a screenshot tells us exactly what failed.
+function purchaseErrorMessage(e: unknown): string {
+  const err = e as { code?: string | number; message?: string } | null;
+  const code = err?.code != null ? String(err.code) : "";
+  const known: Record<string, string> = {
+    [PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR]:
+      "Purchases aren't allowed on this device. Check Settings → Screen Time → Content & Privacy Restrictions.",
+    [PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR]:
+      "This plan isn't available in your region right now.",
+    [PURCHASES_ERROR_CODE.NETWORK_ERROR]:
+      "Couldn't reach the App Store. Check your connection and try again.",
+    [PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR]:
+      "Your purchase is pending approval. You'll get access as soon as it goes through.",
+    [PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR]:
+      "You already have this plan. Tap Restore Purchases.",
+  };
+  const base = known[code] ?? "Something went wrong with your purchase. Please try again.";
+  return code ? `${base} (Error ${code})` : base;
+}
 
 export default function Paywall() {
   const router = useRouter();
@@ -70,9 +91,9 @@ export default function Paywall() {
           router.back();
         }
       },
-      onError: () => {
+      onError: (e) => {
         hapticError();
-        setNotice("Something went wrong with your purchase. Please try again.");
+        setNotice(purchaseErrorMessage(e));
       },
     });
   }

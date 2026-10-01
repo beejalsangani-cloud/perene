@@ -34,8 +34,8 @@ const DISCLOSURE =
 const BENEFITS = [
   "Daily outfit suggestions from your closet",
   "Unlimited closet items & Vision tagging",
-  "Personalised Discover looks",
-  "Save and revisit your favourite outfits",
+  "Personalized Discover looks",
+  "Save and revisit your favorite outfits",
 ] as const;
 
 type PlanId = "monthly" | "annual";

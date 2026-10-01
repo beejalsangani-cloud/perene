@@ -44,7 +44,7 @@ const FIELDS: readonly FieldDef[] = [
     title: "My palette",
     kind: "palette",
     options: ["Neutrals", "Pastels", "Earth tones", "Bold colors", "Black & white", "Pink", "Green", "Blue", "Other"],
-    hint: "Colours you gravitate toward.",
+    hint: "Colors you gravitate toward.",
   },
   {
     id: "lifestyle",
@@ -65,7 +65,7 @@ const FIELDS: readonly FieldDef[] = [
     title: "How you identify",
     kind: "single",
     options: ["Woman", "Man", "Non-binary", "Prefer not to say"],
-    hint: "Personalises your recommendations.",
+    hint: "Personalizes your recommendations.",
   },
   {
     id: "age_range",

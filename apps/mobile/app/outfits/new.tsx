@@ -16,7 +16,7 @@ const QUOTES = [
   "Consulting your wardrobe…",
   "Checking the forecast…",
   "Studying your style DNA…",
-  "Pairing colours with intention…",
+  "Pairing colors with intention…",
   "Curating the perfect silhouette…",
   "Layering textures just so…",
   "Finalising your look…",

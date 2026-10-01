@@ -304,7 +304,7 @@ export default function ConfirmItemScreen() {
         <View>
           <View className="mb-2 flex-row items-center gap-2">
             <Text className="text-xs font-sans-semibold uppercase tracking-widest text-forest/55">
-              Primary colour
+              Primary color
             </Text>
             {aiFields.color && <AiBadge />}
           </View>

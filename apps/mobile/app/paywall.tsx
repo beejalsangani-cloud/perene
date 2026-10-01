@@ -8,10 +8,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PURCHASES_ERROR_CODE, type PurchasesPackage } from "react-native-purchases";
 import { hasActiveEntitlement } from "~/lib/revenuecat";
+import { useAuth } from "~/context/AuthContext";
+import { useCustomerInfo } from "~/hooks/useCustomerInfo";
 import { useOfferings } from "~/hooks/useOfferings";
 import { usePurchasePackage, PURCHASE_CANCELLED } from "~/hooks/usePurchasePackage";
 import { useRestorePurchases } from "~/hooks/useRestorePurchases";
@@ -66,6 +68,11 @@ export default function Paywall() {
   const { monthly, annual, isLoading, isError, refetch } = useOfferings();
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
+  const { signOut } = useAuth();
+  const { customerInfo, isSubscribed } = useCustomerInfo();
+  // Gated = subscription status is known and there is no active membership.
+  // In that state the paywall can't be dismissed (see the gate in _layout).
+  const gated = !!customerInfo && !isSubscribed;
 
   const [selected, setSelected] = useState<PlanId>("monthly");
   const [notice, setNotice] = useState<string | null>(null);
@@ -117,15 +124,18 @@ export default function Paywall() {
 
   return (
     <SafeAreaView className="flex-1 bg-cream" edges={["top", "bottom"]}>
-      {/* Close — dismissible: no feature gating in this phase */}
-      <View className="flex-row justify-end px-4 pt-2">
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
-          className="h-9 w-9 items-center justify-center rounded-full active:opacity-60"
-        >
-          <Ionicons name="close" size={24} color="rgba(42,61,46,0.45)" />
-        </Pressable>
+      <Stack.Screen options={{ gestureEnabled: !gated }} />
+      {/* Close — only when the user already has access (hard paywall otherwise) */}
+      <View className="h-11 flex-row justify-end px-4 pt-2">
+        {!gated ? (
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            className="h-9 w-9 items-center justify-center rounded-full active:opacity-60"
+          >
+            <Ionicons name="close" size={24} color="rgba(42,61,46,0.45)" />
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView contentContainerClassName="px-6 pb-6 gap-7" showsVerticalScrollIndicator={false}>
@@ -238,6 +248,23 @@ export default function Paywall() {
             {restore.isPending ? "Restoring…" : "Restore Purchases"}
           </Text>
         </Pressable>
+
+        {/* Account escape hatch while gated: Profile holds sign-out and
+            account deletion, which must stay reachable without paying. */}
+        {gated ? (
+          <View className="flex-row justify-center gap-6">
+            <Pressable
+              onPress={() => router.dismissTo("/(tabs)/profile")}
+              hitSlop={8}
+              className="active:opacity-60"
+            >
+              <Text className="text-xs font-sans-medium text-forest/55">Account settings</Text>
+            </Pressable>
+            <Pressable onPress={signOut} hitSlop={8} className="active:opacity-60">
+              <Text className="text-xs font-sans-medium text-forest/55">Sign out</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Disclosure + legal */}
         <View className="gap-3">

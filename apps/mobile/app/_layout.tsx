@@ -1,5 +1,5 @@
 import "../global.css";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as SplashScreen from "expo-splash-screen";
@@ -39,8 +39,6 @@ function RootNavigator() {
   const { customerInfo, isSubscribed } = useCustomerInfo();
   const segments = useSegments();
   const router = useRouter();
-  // Present the paywall at most once per launch so dismissing it sticks.
-  const paywallShown = useRef(false);
 
   // Register for push once signed in (best-effort, no-op on simulator/denied).
   usePushRegistration();
@@ -55,18 +53,18 @@ function RootNavigator() {
     }
   }, [session, initializing, segments, router]);
 
-  // First-launch paywall gate. Only fires once we have a definitive
-  // subscription status (customerInfo loaded) and the user isn't subscribed.
-  // Dismissible — no features are gated in this phase.
+  // Hard paywall. Once subscription status is known (customerInfo loaded) and
+  // the user has no active membership or trial, every screen routes to the
+  // paywall. Two exceptions: the auth stack, and the Profile tab, which must
+  // stay reachable so anyone can manage or delete their account (App Store
+  // guideline 5.1.1(v)). If RevenueCat can't load, customerInfo stays null and
+  // the app fails open rather than locking people out.
   useEffect(() => {
-    if (initializing || !session) return;
-    if (paywallShown.current || segments[0] === "(auth)" || segments[0] === "paywall") {
-      return;
-    }
-    if (customerInfo && !isSubscribed) {
-      paywallShown.current = true;
-      router.push("/paywall");
-    }
+    if (initializing || !session || !customerInfo || isSubscribed) return;
+    const [first, second] = segments as string[];
+    if (first === "(auth)" || first === "paywall") return;
+    if (first === "(tabs)" && second === "profile") return;
+    router.push("/paywall");
   }, [initializing, session, customerInfo, isSubscribed, segments, router]);
 
   return (

@@ -99,6 +99,11 @@ export default function LoginPage() {
                 placeholder="Your password"
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#2A3D2E]/15 bg-white text-[#2A3D2E] placeholder-[#2A3D2E]/30 outline-none focus:border-[#C4E552] transition-colors text-sm"
               />
+              <div className="mt-2 text-right">
+                <Link href="/reset-password" className="text-xs font-semibold text-[#2A3D2E]/60 hover:text-[#2A3D2E] underline underline-offset-2">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             {error && (

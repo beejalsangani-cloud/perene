@@ -3,7 +3,7 @@ import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, View } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { PALETTE_SWATCHES, type StyleProfile } from "@perene/shared";
+import { PALETTE_SWATCHES } from "@perene/shared";
 import { useAuth } from "~/context/AuthContext";
 import { useProfile } from "~/hooks/useProfile";
 import { useUpdateProfile, type ProfileAnswers } from "~/hooks/useUpdateProfile";
@@ -12,134 +12,8 @@ import { useRestorePurchases } from "~/hooks/useRestorePurchases";
 import { useDeleteAccount } from "~/hooks/useDeleteAccount";
 import { ENTITLEMENT_ID, hasActiveEntitlement } from "~/lib/revenuecat";
 import { success, warning } from "~/lib/haptics";
-
-// ── Field config — ported from the web quiz STEPS (apps/web/app/quiz/page.js).
-// Order leads with the brand-prominent fields (style, occasions, palette).
-type FieldKind = "single" | "multi" | "palette";
-interface FieldDef {
-  id: keyof ProfileAnswers;
-  title: string;
-  kind: FieldKind;
-  options: readonly string[];
-  hint: string;
-}
-
-const FIELDS: readonly FieldDef[] = [
-  {
-    id: "style_descriptors",
-    title: "My style",
-    kind: "multi",
-    options: ["Classic", "Edgy", "Romantic", "Minimalist", "Bohemian", "Sporty", "Glamorous", "Casual"],
-    hint: "Pick the words that sound like you.",
-  },
-  {
-    id: "typical_events",
-    title: "I dress for",
-    kind: "multi",
-    options: ["Work", "Date nights", "Weekend brunches", "Parties", "Travel", "Workouts", "Errands"],
-    hint: "What do you typically dress for?",
-  },
-  {
-    id: "color_preferences",
-    title: "My palette",
-    kind: "palette",
-    options: ["Neutrals", "Pastels", "Earth tones", "Bold colors", "Black & white", "Pink", "Green", "Blue", "Other"],
-    hint: "Colors you gravitate toward.",
-  },
-  {
-    id: "lifestyle",
-    title: "Lifestyle",
-    kind: "multi",
-    options: ["Office worker", "Creative professional", "Stay-at-home", "Student", "Entrepreneur", "Retired", "Other"],
-    hint: "What's your day-to-day like?",
-  },
-  {
-    id: "body_type",
-    title: "Body type",
-    kind: "single",
-    options: ["Petite", "Tall", "Athletic", "Curvy", "Plus-size", "Straight / Rectangle"],
-    hint: "Optional — helps tailor fit.",
-  },
-  {
-    id: "gender",
-    title: "How you identify",
-    kind: "single",
-    options: ["Woman", "Man", "Non-binary", "Prefer not to say"],
-    hint: "Personalizes your recommendations.",
-  },
-  {
-    id: "age_range",
-    title: "Age range",
-    kind: "single",
-    options: ["18–24", "25–34", "35–44", "45–54", "55+"],
-    hint: "We'll match styles to your life stage.",
-  },
-  {
-    id: "budget_range",
-    title: "Budget per item",
-    kind: "single",
-    options: ["Under $50", "$50–$150", "$150–$300", "$300+"],
-    hint: "Tunes shopping suggestions to your price point.",
-  },
-] as const;
-
-const EMPTY: ProfileAnswers = {
-  gender: null,
-  age_range: null,
-  body_type: null,
-  style_descriptors: [],
-  lifestyle: [],
-  typical_events: [],
-  budget_range: null,
-  color_preferences: [],
-};
-
-function fromProfile(p: StyleProfile | null | undefined): ProfileAnswers {
-  return {
-    gender: p?.gender ?? null,
-    age_range: p?.age_range ?? null,
-    body_type: p?.body_type ?? null,
-    style_descriptors: p?.style_descriptors ?? [],
-    lifestyle: p?.lifestyle ?? [],
-    typical_events: p?.typical_events ?? [],
-    budget_range: p?.budget_range ?? null,
-    color_preferences: p?.color_preferences ?? [],
-  };
-}
-
-// ── Chip ─────────────────────────────────────────────────────────────────────
-function Chip({
-  label,
-  selected,
-  swatch,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  swatch?: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`flex-row items-center gap-2 rounded-full border px-3.5 py-2 ${
-        selected ? "border-lime bg-lime" : "border-forest/15 bg-white active:border-forest/35"
-      }`}
-    >
-      {swatch ? (
-        <View
-          className="h-3.5 w-3.5 rounded-full border border-black/10"
-          style={{ backgroundColor: swatch }}
-        />
-      ) : null}
-      <Text
-        className={`text-xs font-sans-semibold ${selected ? "text-forest" : "text-forest/65"}`}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
+import { EMPTY, FIELDS, fromProfile, toggleAnswer, type FieldDef } from "~/lib/styleQuiz";
+import QuizChip from "~/components/QuizChip";
 
 // ── Section ──────────────────────────────────────────────────────────────────
 function Section({
@@ -170,7 +44,7 @@ function Section({
       </View>
       <View className="flex-row flex-wrap gap-2">
         {field.options.map((opt) => (
-          <Chip
+          <QuizChip
             key={opt}
             label={opt}
             selected={selected(opt)}
@@ -422,17 +296,7 @@ export default function ProfileScreen() {
 
   function toggle(field: FieldDef, value: string) {
     setJustSaved(false);
-    setDraft((prev) => {
-      if (field.kind === "single") {
-        // Tapping the selected option again clears it (fields stay editable).
-        return { ...prev, [field.id]: prev[field.id] === value ? null : value };
-      }
-      const list = (prev[field.id] as string[]) ?? [];
-      const next = list.includes(value)
-        ? list.filter((v) => v !== value)
-        : [...list, value];
-      return { ...prev, [field.id]: next };
-    });
+    setDraft((prev) => toggleAnswer(prev, field, value));
   }
 
   function handleSave() {

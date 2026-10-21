@@ -28,7 +28,10 @@ export function useUpdateProfile() {
       // so the UI reflects them immediately, then revalidate from the source.
       queryClient.setQueriesData<StyleProfile | null>(
         { queryKey: ["profile"] },
-        (cur) => (cur ? { ...cur, ...answers } : cur)
+        // A brand-new user has no row cached yet (null): seed one, so the
+        // onboarding gate sees the saved style immediately and doesn't bounce
+        // them back into the quiz while the refetch is in flight.
+        (cur) => (cur ? { ...cur, ...answers } : ({ ...answers } as StyleProfile))
       );
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },

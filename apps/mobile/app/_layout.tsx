@@ -21,6 +21,10 @@ import {
 import { AuthProvider, useAuth } from "~/context/AuthContext";
 import { SubscriptionProvider } from "~/context/SubscriptionProvider";
 import { useCustomerInfo } from "~/hooks/useCustomerInfo";
+import { useProfile } from "~/hooks/useProfile";
+import { isPurchasesConfigured } from "~/lib/revenuecat";
+import { isProfileComplete } from "~/lib/styleQuiz";
+import { Platform } from "react-native";
 import { usePushRegistration } from "~/hooks/usePushRegistration";
 
 SplashScreen.preventAutoHideAsync();
@@ -36,7 +40,8 @@ const queryClient = new QueryClient({
 // persisted session (initializing === false).
 function RootNavigator() {
   const { session, initializing } = useAuth();
-  const { customerInfo, isSubscribed } = useCustomerInfo();
+  const { customerInfo, isSubscribed, isError: customerInfoError } = useCustomerInfo();
+  const profileQuery = useProfile();
   const segments = useSegments();
   const router = useRouter();
 
@@ -67,6 +72,33 @@ function RootNavigator() {
     router.push("/paywall");
   }, [initializing, session, customerInfo, isSubscribed, segments, router]);
 
+  // Onboarding quiz, after the paywall (Paywall → Quiz → Closet). Waits until
+  // subscription status is settled so a new user never sees the quiz first;
+  // when RevenueCat isn't running (non-iOS, no key) or errors, it fails open
+  // like the paywall does. Done = a style picked (isProfileComplete).
+  useEffect(() => {
+    if (initializing || !session) return;
+    const purchasesLive = Platform.OS === "ios" && isPurchasesConfigured();
+    if (purchasesLive && !customerInfo && !customerInfoError) return; // still loading
+    if (customerInfo && !isSubscribed) return; // paywall comes first
+    if (profileQuery.isLoading || profileQuery.isError) return;
+    if (isProfileComplete(profileQuery.data)) return;
+    const [first] = segments as string[];
+    if (first === "(auth)" || first === "paywall" || first === "onboarding") return;
+    router.replace("/onboarding");
+  }, [
+    initializing,
+    session,
+    customerInfo,
+    customerInfoError,
+    isSubscribed,
+    profileQuery.isLoading,
+    profileQuery.isError,
+    profileQuery.data,
+    segments,
+    router,
+  ]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
@@ -81,6 +113,7 @@ function RootNavigator() {
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen name="outfits/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="onboarding" options={{ gestureEnabled: false, animation: "fade" }} />
       <Stack.Screen
         name="paywall"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}

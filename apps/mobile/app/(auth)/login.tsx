@@ -20,6 +20,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
 
   async function handleSubmit() {
     setError("");
@@ -30,6 +32,29 @@ export default function LoginScreen() {
     });
     setLoading(false);
     if (authError) setError(authError.message);
+  }
+
+  // Emails a recovery link. The link opens myperene.com/reset-password, where
+  // the new password is set; then the user comes back here to log in.
+  async function handleForgot() {
+    setError("");
+    setNotice("");
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Enter your email above, then tap Forgot password.");
+      return;
+    }
+    setSendingReset(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed, {
+      redirectTo: "https://myperene.com/reset-password",
+    });
+    setSendingReset(false);
+    // Same message whether or not the account exists.
+    if (resetError && !/not found|no user/i.test(resetError.message)) {
+      setError("Couldn't send the email right now. Please try again in a few minutes.");
+      return;
+    }
+    setNotice(`If there's a Perene account for ${trimmed}, a reset link is on its way. Check your email (and spam).`);
   }
 
   return (
@@ -88,7 +113,23 @@ export default function LoginScreen() {
                 placeholderTextColor="rgba(42,61,46,0.3)"
                 className="rounded-xl border-2 border-forest/15 bg-white px-4 py-3 text-sm text-forest"
               />
+              <Pressable
+                onPress={handleForgot}
+                disabled={sendingReset}
+                hitSlop={8}
+                className="mt-2 self-end active:opacity-60"
+              >
+                <Text className="text-xs font-sans-semibold text-forest/60 underline">
+                  {sendingReset ? "Sending…" : "Forgot password?"}
+                </Text>
+              </Pressable>
             </View>
+
+            {notice ? (
+              <View className="rounded-xl border border-forest/15 bg-white px-4 py-3">
+                <Text className="text-sm font-sans-medium text-forest">{notice}</Text>
+              </View>
+            ) : null}
 
             {error ? (
               <View className="flex-row items-center gap-2 rounded-xl border border-forest/15 bg-white px-4 py-3">

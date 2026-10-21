@@ -82,8 +82,8 @@ export default function Onboarding() {
         <View>
           <Text className="font-display text-3xl leading-tight text-forest">{field.question}</Text>
           <Text className="mt-2 text-sm font-sans text-forest/55">
-            {field.kind === "single" ? "Pick one. " : "Pick all that apply. "}
-            {required ? "Required." : field.hint}
+            {field.kind === "single" ? "Pick one." : "Pick all that apply."}
+            {required ? " Required." : " You can skip this."}
           </Text>
         </View>
 

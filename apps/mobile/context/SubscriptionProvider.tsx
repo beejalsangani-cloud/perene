@@ -3,7 +3,7 @@
 // and out, and forwards live customerInfo updates (renewals, expirations,
 // dashboard-granted access) into the React Query cache so useCustomerInfo
 // reflects them without a manual refetch. Renders children unchanged.
-import { useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import Purchases, { type CustomerInfo } from "react-native-purchases";
@@ -19,9 +19,19 @@ import {
 // write to it.
 export const CUSTOMER_INFO_KEY = ["customerInfo"] as const;
 
+// The Supabase user id RevenueCat has finished logging in as (null while it's
+// still anonymous). Until it matches the signed-in user, CustomerInfo can
+// belong to the anonymous launch identity and wrongly read "not subscribed",
+// so useCustomerInfo holds off and the paywall gate waits.
+const IdentityContext = createContext<string | null>(null);
+export function useRevenueCatIdentity() {
+  return useContext(IdentityContext);
+}
+
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [identifiedUserId, setIdentifiedUserId] = useState<string | null>(null);
 
   // Configure once + subscribe to live customerInfo updates.
   useEffect(() => {
@@ -49,16 +59,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         .then(({ customerInfo }) => {
           logPurchaseEvent("login", { appUserID: user.id });
           queryClient.setQueryData(CUSTOMER_INFO_KEY, customerInfo);
+          setIdentifiedUserId(user.id);
         })
-        .catch((e) => console.warn("[revenuecat] logIn failed", e));
+        .catch((e) => {
+          console.warn("[revenuecat] logIn failed", e);
+          // Fail open: let useCustomerInfo fetch anyway rather than hang.
+          setIdentifiedUserId(user.id);
+        });
     } else {
       // logOut rejects for an already-anonymous user — safe to ignore.
       Purchases.logOut()
         .then(() => logPurchaseEvent("logout"))
         .catch(() => {});
       queryClient.removeQueries({ queryKey: CUSTOMER_INFO_KEY });
+      setIdentifiedUserId(null);
     }
   }, [user?.id, queryClient]);
 
-  return <>{children}</>;
+  return <IdentityContext.Provider value={identifiedUserId}>{children}</IdentityContext.Provider>;
 }

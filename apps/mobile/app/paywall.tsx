@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -74,6 +74,20 @@ export default function Paywall() {
   // In that state the paywall can't be dismissed (see the gate in _layout).
   const gated = !!customerInfo && !isSubscribed;
 
+  // Close exactly once — after a purchase/restore, or if an active membership
+  // shows up while the paywall is open (e.g. a slow login on launch).
+  const closed = useRef(false);
+  function close() {
+    if (closed.current) return;
+    closed.current = true;
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
+  }
+  useEffect(() => {
+    if (isSubscribed) close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSubscribed]);
+
   const [selected, setSelected] = useState<PlanId>("monthly");
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -95,7 +109,7 @@ export default function Paywall() {
       onSuccess: (result) => {
         if (result !== PURCHASE_CANCELLED) {
           success();
-          router.back();
+          close();
         }
       },
       onError: (e) => {
@@ -112,7 +126,7 @@ export default function Paywall() {
       onSuccess: (info) => {
         if (hasActiveEntitlement(info)) {
           success();
-          router.back();
+          close();
         } else setNotice("No active subscription found to restore.");
       },
       onError: () => setNotice("Couldn't restore purchases. Please try again."),
